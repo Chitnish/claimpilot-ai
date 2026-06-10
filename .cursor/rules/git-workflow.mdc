@@ -1,0 +1,8 @@
+﻿---
+description: Git workflow (invoke manually with @git-workflow)
+alwaysApply: false
+---
+- Commit at every working milestone; small, atomic commits.
+- Message style: `<area>: <imperative summary>` e.g. `agents: add intake extraction with confidence scores`. Areas: repo, backend, frontend, agents, graph, ml, db, rules, docs, deploy.
+- Never commit: .env, .env.local, .venv, node_modules, data dumps, generated PDFs.
+- Push to origin main after each phase gate. No force-push without asking.

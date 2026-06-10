@@ -1,0 +1,13 @@
+﻿---
+description: Python / FastAPI / LangGraph conventions
+globs: backend/**/*.py
+alwaysApply: false
+---
+- Async-first FastAPI: `async def` routes, httpx.AsyncClient for IO, no blocking calls in routes.
+- All data shapes are Pydantic v2 models in backend/app/schemas (ConfigDict, model_validate, model_dump). No bare dicts crossing function boundaries.
+- LangGraph: single typed `ClaimState` (Pydantic) shared by all nodes. Each agent is a module in backend/app/agents exposing `async def run(state: ClaimState) -> ClaimState`. Supervisor routing logic lives only in backend/app/graph.
+- Every agent node MUST write an `agent_runs` trace row (agent, event, summary, payload, latency_ms) — this powers the live demo feed. The summary field is exec-readable plain English, not a log line.
+- LLM calls: use structured outputs (Pydantic response schemas) everywhere; model IDs only via env vars; one thin client wrapper in backend/app/services/llm.py.
+- Confidence scores accompany every extracted field; anything below CONFIDENCE_THRESHOLD routes to review_queue.
+- Errors: raise typed exceptions; never swallow; never print secrets or document contents.
+- Tests in backend/tests mirror module paths; pytest, no unittest classes.

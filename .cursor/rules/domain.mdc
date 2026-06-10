@@ -1,0 +1,13 @@
+﻿---
+description: Healthcare billing domain conventions
+globs: backend/app/agents/**,backend/app/schemas/**,backend/app/pdf/**,backend/app/services/**,backend/app/ml/**
+alwaysApply: false
+---
+Domain model (faithful but simulated):
+- Diagnoses: ICD-10-CM (e.g., E11.9). Procedures: CPT/HCPCS (e.g., 99213) with modifiers (25, 59...). Every claim line links ≥1 ICD-10 to its CPT (medical-necessity linkage).
+- Claim form: CMS-1500 fields (boxes 1–33); electronic analogue is 837P. Remittance: 835/ERA with CARC (adjustment reason) + RARC (remark) codes — use real public code meanings (e.g., CARC 16, 97, 50).
+- Eligibility check simulates the 270/271 transaction via the mock payer service.
+- Money is numeric(10,2) / Decimal — never float arithmetic on charges.
+- Per-field confidence on all extractions; three HITL gates: low extraction confidence, denial risk > threshold, reconciliation variance > tolerance → review_queue.
+- Appeal letters must cite the specific CARC/RARC, reference the clinical facts in state, and argue medical necessity — reasoned prose, not templates.
+- All sample data is synthetic (Faker). Never fabricate real patient/provider identities or real NPIs of actual people.

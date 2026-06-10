@@ -1,0 +1,15 @@
+﻿---
+description: ClaimPilot AI — core project context
+alwaysApply: true
+---
+ClaimPilot AI: multi-agent healthcare claims automation (intern demo project).
+Pipeline: intake (vision extraction) → eligibility → coding (ICD-10/CPT) → claim scrub/CMS-1500 → denial-risk ML → submission/appeals → reconciliation, orchestrated by a LangGraph supervisor over a shared typed ClaimState, with a human review queue.
+
+Stack: FastAPI + LangGraph + Pydantic v2 (backend, Python 3.11), Next.js 14 App Router + TS + Tailwind + shadcn/ui (frontend), Supabase (Postgres/RLS/Storage), OpenAI (models from env vars MODEL_REASONING / MODEL_FAST / MODEL_VISION — never hardcode model names).
+
+Hard constraints:
+- Windows + PowerShell. Never emit bash heredocs or `&&` chains for the user; use PowerShell syntax. Quote paths (username contains parentheses).
+- Python 3.11 only. Venv: .\.venv\Scripts\Activate.ps1
+- SYNTHETIC DATA ONLY. Never generate, request, or log real PHI. No PHI-like values in logs or error messages.
+- Never run destructive ops (deletes, drops, force-push, bulk overwrites) without asking first.
+- Secrets live in backend/.env and frontend/.env.local only — never in committed files.

@@ -1,0 +1,11 @@
+﻿---
+description: Next.js / TypeScript / UI conventions
+globs: frontend/**
+alwaysApply: false
+---
+- Next.js 14 App Router, server components by default, "use client" only where interactive.
+- Strict TypeScript: no `any`, explicit return types on exported functions, zod for API response parsing.
+- UI: shadcn/ui components + Tailwind only (no other UI libs). Icons: lucide-react. Charts: Recharts. Animation: Framer Motion (pipeline diagram). Uploads: react-dropzone.
+- All backend calls go through a typed client in frontend/lib/api.ts using NEXT_PUBLIC_API_URL. The live agent feed consumes SSE from the backend.
+- Design for the demo: clean, readable agent activity (plain-English summaries), generous whitespace, status colors (emerald=clean, amber=review, red=denied).
+- Never call OpenAI or use service-role keys from the frontend.

@@ -1,0 +1,18 @@
+﻿# env / secrets
+.env
+.env.local
+*.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# node
+node_modules/
+.next/
+
+# artifacts
+backend/data/synthetic/*.pdf
+backend/data/synthetic/*.png
+*.pkl
