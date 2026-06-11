@@ -143,6 +143,18 @@ def seed_claims() -> int:
             "created_at": created_at,
         }).execute()
 
+        if status == "needs_review":
+            sb.table("review_queue").insert({
+                "org_id": org_id,
+                "claim_id": claim_id,
+                "reason": f"Denial risk {denial_risk:.0%} exceeds threshold",
+                "details": {
+                    "denial_risk": denial_risk,
+                    "low_confidence_fields": [],
+                },
+                "status": "open",
+            }).execute()
+
         seeded += 1
 
     return seeded

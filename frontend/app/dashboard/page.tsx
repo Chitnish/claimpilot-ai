@@ -216,9 +216,6 @@ export default function DashboardPage(): React.ReactElement {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{stats.cleanClaimRate}%</p>
-            <p className="text-xs text-muted-foreground">
-              Industry avg: 85%
-            </p>
           </CardContent>
         </Card>
 
@@ -299,7 +296,6 @@ export default function DashboardPage(): React.ReactElement {
                 <p className="text-2xl font-bold text-[#1e3a5f]">
                   {stats.denialRate}%
                 </p>
-                <p className="text-xs text-muted-foreground">Target: &lt; 15%</p>
               </div>
             </div>
           </div>

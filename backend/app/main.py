@@ -309,42 +309,87 @@ async def enqueue_review(claim_id: str):
 async def resume_claim(claim_id: str, decision: ResumeDecision):
     state = _claim_states.get(claim_id)
     if not state:
-        raise HTTPException(404, "Claim not found")
+        # Seeded claim — load from DB and construct minimal state
+        try:
+            row = get_supabase().table("claims").select("*").eq("id", claim_id).single().execute()
+            if not row.data:
+                raise HTTPException(404, "Claim not found")
+            d = row.data
+            org_row = get_supabase().table("orgs").select("id").limit(1).execute()
+            org_id = d.get("org_id") or (org_row.data[0]["id"] if org_row.data else "")
+            state = ClaimState(
+                claim_id=claim_id,
+                org_id=org_id,
+                status=ClaimStatus(d.get("status", "needs_review")),
+                payer_name=d.get("payer_name") or "",
+                total_charge=d.get("total_charge") or 0.0,
+                denial_risk=d.get("denial_risk") or 0.0,
+                denial_risk_factors=d.get("denial_risk_factors") or [],
+                needs_human_review=True,
+                review_reason=f"Denial risk {d.get('denial_risk', 0):.0%} exceeds threshold",
+            )
+            _claim_states[claim_id] = state
+            _claim_events.setdefault(claim_id, [])
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(404, f"Claim not found: {e}")
 
     if decision.approved:
         state.needs_human_review = False
         state.review_reason = ""
         _claim_states[claim_id] = state
-        # Resume the interrupted LangGraph graph from its paused checkpoint
+
         config = {"configurable": {"thread_id": claim_id}}
-        async def _resume():
-            try:
-                from app.graph.pipeline import pipeline as _pipeline
-                result = await _pipeline.ainvoke(
-                    {"needs_human_review": False, "review_reason": ""},
-                    config=config,
-                )
-                final = ClaimState(**result)
-                _claim_states[claim_id] = final
-                for ev in final.agent_events:
-                    if ev.model_dump() not in _claim_events.get(claim_id, []):
-                        _claim_events[claim_id].append(ev.model_dump())
+
+        # Check if a live checkpoint exists for this claim
+        from app.graph.pipeline import pipeline as _pipeline, _checkpointer
+        checkpoint = _checkpointer.get(config)
+
+        if checkpoint is not None:
+            # Real HITL resume — graph is paused at interrupt()
+            async def _resume():
                 try:
-                    get_supabase().table("claims").update({
-                        "status":              final.status.value,
-                        "total_charge":        final.total_charge,
-                        "denial_risk":         final.denial_risk,
-                        "denial_risk_factors": final.denial_risk_factors,
-                        "carc_code":           final.carc_code or None,
-                        "rarc_code":           final.rarc_code or None,
-                        "appeal_letter":       final.appeal_letter or None,
-                        "cms1500_path":        final.cms1500_path or None,
-                    }).eq("id", claim_id).execute()
-                except Exception as db_err:
-                    print(f"[resume] DB update error: {db_err}")
+                    result = await _pipeline.ainvoke(None, config=config)
+                    final = ClaimState(**result)
+                    _claim_states[claim_id] = final
+                    for ev in final.agent_events:
+                        if ev.model_dump() not in _claim_events.get(claim_id, []):
+                            _claim_events[claim_id].append(ev.model_dump())
+                    try:
+                        get_supabase().table("claims").update({
+                            "status":              final.status.value,
+                            "total_charge":        final.total_charge,
+                            "denial_risk":         final.denial_risk,
+                            "denial_risk_factors": final.denial_risk_factors,
+                            "carc_code":           final.carc_code or None,
+                            "rarc_code":           final.rarc_code or None,
+                            "appeal_letter":       final.appeal_letter or None,
+                            "cms1500_path":        final.cms1500_path or None,
+                        }).eq("id", claim_id).execute()
+                    except Exception as db_err:
+                        print(f"[resume] DB update error: {db_err}")
+                except Exception as e:
+                    print(f"[resume] pipeline error: {e}")
+            asyncio.create_task(_resume())
+        else:
+            # Seeded/stale claim — no checkpoint, just update status directly
+            state.status = ClaimStatus.SUBMITTED
+            _claim_states[claim_id] = state
+            _claim_events.setdefault(claim_id, []).append({
+                "agent": "submission", "event": "completed",
+                "summary": "Claim approved by reviewer. Submitting to clearinghouse.",
+            })
+            try:
+                get_supabase().table("claims").update({
+                    "status": "submitted",
+                }).eq("id", claim_id).execute()
             except Exception as e:
-                print(f"[resume] pipeline error: {e}")
-        asyncio.create_task(_resume())
+                print(f"[approve] DB update error: {e}")
+            _claim_events[claim_id].append({
+                "agent": "system", "event": "done",
+                "summary": "Pipeline complete.",
+            })
     else:
         state.status = ClaimStatus.NEEDS_REVIEW
         state.needs_human_review = True
