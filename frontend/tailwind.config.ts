@@ -7,6 +7,12 @@ const config: Config = {
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
   ],
+  safelist: [
+    "bg-red-500",
+    "bg-amber-500",
+    "bg-emerald-500",
+    "bg-gray-200",
+  ],
   theme: {
     container: {
       center: true,

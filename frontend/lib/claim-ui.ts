@@ -1,3 +1,4 @@
+// Tailwind safelist: bg-red-500 bg-amber-500 bg-emerald-500 bg-gray-200
 import type { VariantProps } from "class-variance-authority";
 
 import { badgeVariants } from "@/components/ui/badge";
@@ -32,10 +33,10 @@ export function statusBadgeVariant(status: string): BadgeVariant {
   }
 }
 
-export function denialRiskColor(risk: number): string {
-  if (risk < 40) return "bg-emerald-500";
-  if (risk <= 60) return "bg-amber-500";
-  return "bg-red-500";
+export function denialRiskColor(percent: number): string {
+  if (percent >= 60) return "bg-red-500";
+  if (percent >= 40) return "bg-amber-500";
+  return "bg-emerald-500";
 }
 
 export function formatCurrency(amount: number | null | undefined): string {

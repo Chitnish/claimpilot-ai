@@ -72,6 +72,9 @@ class ClaimState(BaseModel):
     denial_risk: float = 0.0
     denial_risk_factors: list[str] = Field(default_factory=list)
 
+    # Fraud / anomaly
+    anomaly_score: float = 0.0
+
     # Submission
     clearinghouse_ref: str = ""
     submission_status: str = ""

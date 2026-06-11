@@ -32,7 +32,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -251,11 +251,15 @@ export default function DashboardPage(): React.ReactElement {
                         </TableCell>
                         <TableCell className="w-36">
                           <div className="flex items-center gap-2">
-                            <Progress
-                              value={riskPercent}
-                              indicatorClassName={denialRiskColor(riskPercent)}
-                              className="flex-1"
-                            />
+                            <div className="h-2 w-full rounded-full bg-gray-200">
+                              <div
+                                className={cn(
+                                  "h-2 rounded-full transition-all",
+                                  denialRiskColor(riskPercent),
+                                )}
+                                style={{ width: `${riskPercent}%` }}
+                              />
+                            </div>
                             <span className="w-8 text-xs text-muted-foreground">
                               {riskPercent}%
                             </span>

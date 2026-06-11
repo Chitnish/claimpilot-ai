@@ -100,7 +100,8 @@ async def upload_document(file: UploadFile = File(...)):
 
 async def _run_pipeline(claim_id: str, state: ClaimState):
     try:
-        final_state_dict = await pipeline.ainvoke(state.model_dump())
+        config = {"configurable": {"thread_id": claim_id}}
+        final_state_dict = await pipeline.ainvoke(state.model_dump(), config=config)
         final_state = ClaimState(**final_state_dict)
         _claim_states[claim_id] = final_state
 
@@ -123,24 +124,6 @@ async def _run_pipeline(claim_id: str, state: ClaimState):
         except Exception as e:
             print(f"[pipeline] claim update error: {e}")
 
-        if (
-            final_state.needs_human_review
-            and final_state.status == ClaimStatus.NEEDS_REVIEW
-        ):
-            try:
-                get_supabase().table("review_queue").insert({
-                    "org_id": final_state.org_id,
-                    "claim_id": claim_id,
-                    "reason": final_state.review_reason,
-                    "details": {
-                        "denial_risk": final_state.denial_risk,
-                        "low_confidence_fields": final_state.low_confidence_fields,
-                    },
-                    "status": "open",
-                }).execute()
-            except Exception as e:
-                print(f"[pipeline] review_queue insert error: {e}")
-
     except Exception as exc:
         print(f"[pipeline] error for {claim_id}: {exc}")
         _claim_events[claim_id].append({
@@ -154,14 +137,14 @@ async def stream_events(claim_id: str):
     """SSE endpoint — streams agent events as they are appended."""
     async def generator():
         sent = 0
-        for _ in range(120):  # 2-min timeout
+        for _ in range(300):  # 5-min timeout
             events = _claim_events.get(claim_id, [])
             while sent < len(events):
                 yield {"data": json.dumps(events[sent])}
                 sent += 1
             state = _claim_states.get(claim_id)
             if state and state.status.value in (
-                "reconciled", "appealed", "needs_review", "paid"
+                "reconciled", "appealed", "paid"
             ):
                 yield {"data": json.dumps({"agent": "system", "event": "done",
                                            "summary": "Pipeline complete."})}
@@ -332,7 +315,36 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
         state.needs_human_review = False
         state.review_reason = ""
         _claim_states[claim_id] = state
-        asyncio.create_task(_run_pipeline(claim_id, state))
+        # Resume the interrupted LangGraph graph from its paused checkpoint
+        config = {"configurable": {"thread_id": claim_id}}
+        async def _resume():
+            try:
+                from app.graph.pipeline import pipeline as _pipeline
+                result = await _pipeline.ainvoke(
+                    {"needs_human_review": False, "review_reason": ""},
+                    config=config,
+                )
+                final = ClaimState(**result)
+                _claim_states[claim_id] = final
+                for ev in final.agent_events:
+                    if ev.model_dump() not in _claim_events.get(claim_id, []):
+                        _claim_events[claim_id].append(ev.model_dump())
+                try:
+                    get_supabase().table("claims").update({
+                        "status":              final.status.value,
+                        "total_charge":        final.total_charge,
+                        "denial_risk":         final.denial_risk,
+                        "denial_risk_factors": final.denial_risk_factors,
+                        "carc_code":           final.carc_code or None,
+                        "rarc_code":           final.rarc_code or None,
+                        "appeal_letter":       final.appeal_letter or None,
+                        "cms1500_path":        final.cms1500_path or None,
+                    }).eq("id", claim_id).execute()
+                except Exception as db_err:
+                    print(f"[resume] DB update error: {db_err}")
+            except Exception as e:
+                print(f"[resume] pipeline error: {e}")
+        asyncio.create_task(_resume())
     else:
         state.status = ClaimStatus.NEEDS_REVIEW
         state.needs_human_review = True

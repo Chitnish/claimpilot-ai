@@ -16,3 +16,6 @@ node_modules/
 backend/data/synthetic/*.pdf
 backend/data/synthetic/*.png
 *.pkl
+
+backend/app/ml/*.pkl
+backend/app/ml/*.joblib

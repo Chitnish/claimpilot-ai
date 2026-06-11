@@ -27,12 +27,6 @@ def _scrub_rules(state: ClaimState) -> list[str]:
             issues.append(f"Line {ln.line_no}: no diagnosis codes")
         if ln.charge <= 0:
             issues.append(f"Line {ln.line_no}: invalid charge ${ln.charge}")
-    # Stub denial risk (Phase 4 replaces with real ML model)
-    state.denial_risk = 0.72 if len(state.coding_issues) > 0 else 0.28
-    state.denial_risk_factors = (
-        ["Coding issues present", "High modifier complexity"]
-        if state.coding_issues else ["Clean claim", "Low complexity"]
-    )
     return issues
 
 
@@ -47,6 +41,17 @@ async def run(state: ClaimState) -> ClaimState:
     issues = _scrub_rules(state)
     state.scrub_issues = issues
     state.scrub_passed = len(issues) == 0
+
+    # Real ML denial risk prediction (Phase 4)
+    try:
+        from app.ml.predictor import predict_denial_risk
+        risk_score, shap_factors = await predict_denial_risk(state.model_dump())
+        state.denial_risk = risk_score
+        state.denial_risk_factors = shap_factors
+    except Exception as e:
+        print(f"[scrub] ML prediction error: {e}")
+        state.denial_risk = 0.5
+        state.denial_risk_factors = ["Prediction unavailable"]
 
     # Generate CMS-1500 PDF
     pdf_dir = Path("data/synthetic")

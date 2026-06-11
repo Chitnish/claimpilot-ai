@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Info,
   Loader2,
   User,
 } from "lucide-react";
@@ -30,7 +31,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 export default function ClaimDetailPage(): React.ReactElement {
@@ -228,10 +228,47 @@ export default function ClaimDetailPage(): React.ReactElement {
                   <span className="text-muted-foreground">Denial risk</span>
                   <span className="font-medium">{riskPercent}%</span>
                 </div>
-                <Progress
-                  value={riskPercent}
-                  indicatorClassName={denialRiskColor(riskPercent)}
-                />
+                <div className="h-2 w-full rounded-full bg-gray-200">
+                  <div
+                    className={cn(
+                      "h-2 rounded-full transition-all",
+                      denialRiskColor(riskPercent),
+                    )}
+                    style={{ width: `${riskPercent}%` }}
+                  />
+                </div>
+                {claim.denialRiskFactors.length > 0 && (
+                  <div className="mt-3">
+                    <p className="mb-1.5 text-sm text-muted-foreground">
+                      Risk factors
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {claim.denialRiskFactors.map((factor) => (
+                        <span
+                          key={factor}
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                            factor.includes("+")
+                              ? "bg-amber-100 text-amber-800"
+                              : factor.includes("-")
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-gray-100 text-gray-700",
+                          )}
+                        >
+                          {factor}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {claim.anomalyScore > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Info className="size-3.5 shrink-0" />
+                    <span>
+                      Anomaly score: {Math.round(claim.anomalyScore * 100)}%
+                    </span>
+                  </div>
+                )}
               </div>
               {claim.cms1500Path && (
                 <Button asChild variant="outline" className="w-full">

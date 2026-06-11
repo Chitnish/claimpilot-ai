@@ -24,7 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 15_000;
@@ -185,10 +184,15 @@ export default function ReviewPage(): React.ReactElement {
                       <span className="text-muted-foreground">Denial risk</span>
                       <span className="font-medium">{riskPercent}%</span>
                     </div>
-                    <Progress
-                      value={riskPercent}
-                      indicatorClassName={denialRiskColor(riskPercent)}
-                    />
+                    <div className="h-2 w-full rounded-full bg-gray-200">
+                      <div
+                        className={cn(
+                          "h-2 rounded-full transition-all",
+                          denialRiskColor(riskPercent),
+                        )}
+                        style={{ width: `${riskPercent}%` }}
+                      />
+                    </div>
                   </div>
 
                   <div>
