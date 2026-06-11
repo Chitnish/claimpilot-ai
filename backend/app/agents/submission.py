@@ -75,6 +75,17 @@ Draft a complete appeal letter."""
             user=appeal_prompt,
         )
         state.appeal_letter = appeal_text
+
+        # Send appeal email via Resend
+        from app.services.resend_client import send_appeal_email
+        email_sent = await send_appeal_email(
+            claim_id=state.claim_id,
+            patient_name=state.patient_name,
+            payer_name=state.payer_name,
+            carc_code=state.carc_code,
+            appeal_letter=appeal_text,
+        )
+
         state.status = ClaimStatus.APPEALED
         latency_ms = int((time.monotonic() - t0) * 1000)
 
@@ -82,6 +93,7 @@ Draft a complete appeal letter."""
             f"Appeal letter drafted for CARC {state.carc_code} denial — "
             f"{len(appeal_text.split())} words, citing medical necessity for "
             f"{', '.join(set(c for ln in state.claim_lines for c in ln.icd10_codes))}."
+            + (" Appeal email sent." if email_sent else " (Email not configured.)")
         )
         state.agent_events.append(AgentEvent(
             agent="submission", event="completed",

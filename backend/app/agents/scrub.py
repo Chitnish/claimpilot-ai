@@ -62,11 +62,24 @@ async def run(state: ClaimState) -> ClaimState:
     else:
         summary = f"Claim passed all scrub rules. CMS-1500 generated at {pdf_path.name}. Denial risk: {state.denial_risk:.0%}."
 
-    # High denial risk gate
-    if state.denial_risk >= DENIAL_RISK_THRESHOLD and not state.needs_human_review:
+    # High denial risk gate — only flag if not already reviewed
+    already_reviewed = "denial risk" in state.review_reason.lower() if state.review_reason else False
+    if state.denial_risk >= DENIAL_RISK_THRESHOLD and not state.needs_human_review and not already_reviewed:
         state.needs_human_review = True
         state.review_reason = f"Denial risk {state.denial_risk:.0%} exceeds threshold"
+        state.status = ClaimStatus.NEEDS_REVIEW
         summary += f" ⚠ High denial risk ({state.denial_risk:.0%}) — flagged for review."
+        from app.services.supabase_client import get_supabase
+        try:
+            get_supabase().table("review_queue").insert({
+                "org_id": state.org_id,
+                "claim_id": state.claim_id,
+                "reason": state.review_reason,
+                "details": {"denial_risk": state.denial_risk, "low_confidence_fields": []},
+                "status": "open",
+            }).execute()
+        except Exception as e:
+            print(f"[scrub] review_queue insert error: {e}")
 
     state.agent_events.append(AgentEvent(
         agent="scrub", event="completed",
@@ -80,5 +93,7 @@ async def run(state: ClaimState) -> ClaimState:
     )
 
     if not state.needs_human_review:
+        state.status = ClaimStatus.SCRUBBED
+    elif already_reviewed:
         state.status = ClaimStatus.SCRUBBED
     return state

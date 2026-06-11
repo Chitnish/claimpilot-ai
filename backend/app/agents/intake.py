@@ -123,11 +123,11 @@ async def run(state: ClaimState) -> ClaimState:
     state.agent_events.append(AgentEvent(
         agent="intake", event="completed",
         summary=summary,
-        payload={"confidence": extraction.confidence, "lines": len(state.claim_lines)},
+        payload={"confidence": extraction.confidence.model_dump(), "lines": len(state.claim_lines)},
         latency_ms=latency_ms,
     ))
     await log_agent_event(
         state.claim_id, state.org_id, "intake", "completed",
-        summary, {"confidence": extraction.confidence}, latency_ms,
+        summary, {"confidence": extraction.confidence.model_dump()}, latency_ms,
     )
     return state

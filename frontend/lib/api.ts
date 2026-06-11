@@ -2,9 +2,13 @@ import {
   agentEventSchema,
   claimSchema,
   claimsListSchema,
+  resumeResponseSchema,
+  reviewQueueSchema,
   uploadResponseSchema,
   type AgentEvent,
   type Claim,
+  type ResumeResponse,
+  type ReviewItem,
   type UploadResponse,
 } from "@/lib/schemas";
 
@@ -57,6 +61,34 @@ export async function listClaims(): Promise<Claim[]> {
 
 export function cms1500Url(claimId: string): string {
   return `${API_BASE}/claims/${claimId}/cms1500`;
+}
+
+export async function getReviewQueue(): Promise<ReviewItem[]> {
+  const response = await fetch(`${API_BASE}/review`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load review queue (${response.status})`);
+  }
+
+  return parseJson(response, reviewQueueSchema);
+}
+
+export async function resumeClaim(
+  claimId: string,
+  approved: boolean,
+  reviewerNotes: string,
+): Promise<ResumeResponse> {
+  const response = await fetch(`${API_BASE}/claims/${claimId}/resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved, reviewer_notes: reviewerNotes }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to resume claim (${response.status})`);
+  }
+
+  return parseJson(response, resumeResponseSchema);
 }
 
 export function subscribeToClaimEvents(

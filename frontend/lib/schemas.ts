@@ -74,3 +74,47 @@ export type ClaimsList = z.infer<typeof claimsListSchema>;
 export interface TimelineEvent extends AgentEvent {
   receivedAt: Date;
 }
+
+export const reviewDetailsSchema = z.object({
+  denial_risk: z.number().optional(),
+  low_confidence_fields: z.array(z.string()).optional(),
+});
+
+export type ReviewDetails = z.infer<typeof reviewDetailsSchema>;
+
+export const reviewItemSchema = z
+  .object({
+    id: z.string(),
+    claim_id: z.string(),
+    reason: z.string().default(""),
+    details: reviewDetailsSchema.default({}),
+    created_at: z.string().default(""),
+    claim_status: z.string().default(""),
+    total_charge: z.number().default(0),
+    patient_name: z.string().default(""),
+    denial_risk: z.number().default(0),
+  })
+  .transform((data) => ({
+    id: data.id,
+    claimId: data.claim_id,
+    reason: data.reason,
+    details: data.details,
+    createdAt: data.created_at,
+    claimStatus: data.claim_status,
+    totalCharge: data.total_charge,
+    patientName: data.patient_name,
+    denialRisk: data.denial_risk,
+  }));
+
+export type ReviewItem = z.infer<typeof reviewItemSchema>;
+
+export const reviewQueueSchema = z.array(reviewItemSchema);
+
+export type ReviewQueue = z.infer<typeof reviewQueueSchema>;
+
+export const resumeResponseSchema = z.object({
+  resumed: z.boolean(),
+  approved: z.boolean(),
+});
+
+export type ResumeResponse = z.infer<typeof resumeResponseSchema>;
