@@ -26,6 +26,7 @@ export default function UploadPage(): React.ReactElement {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -36,7 +37,7 @@ export default function UploadPage(): React.ReactElement {
       setError(null);
 
       try {
-        const result = await uploadClaim(file);
+        const result = await uploadClaim(file, demoMode);
         router.push(`/claims/${result.claim_id}`);
       } catch (err) {
         const message =
@@ -45,7 +46,7 @@ export default function UploadPage(): React.ReactElement {
         setUploading(false);
       }
     },
-    [router],
+    [router, demoMode],
   );
 
   const onDropRejected = useCallback((rejections: FileRejection[]) => {
@@ -106,6 +107,31 @@ export default function UploadPage(): React.ReactElement {
                 </p>
               </>
             )}
+          </div>
+
+          <div className="mt-4 flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium">Demo Mode</p>
+              <p className="text-xs text-muted-foreground">
+                Forces denial + appeal letter for guaranteed golden-path demo
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={demoMode}
+              onClick={() => setDemoMode((v) => !v)}
+              className={cn(
+                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                demoMode ? "bg-[#1e3a5f]" : "bg-gray-200",
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block size-4 rounded-full bg-white shadow transition-transform",
+                  demoMode ? "translate-x-6" : "translate-x-1",
+                )}
+              />
+            </button>
           </div>
 
           {error && (

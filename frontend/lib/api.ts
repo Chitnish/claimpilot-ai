@@ -23,11 +23,18 @@ async function parseJson<T>(
   return schema.parse(data);
 }
 
-export async function uploadClaim(file: File): Promise<UploadResponse> {
+export async function uploadClaim(
+  file: File,
+  demo = false,
+): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE}/claims/upload`, {
+  const url = demo
+    ? `${API_BASE}/claims/upload?demo=true`
+    : `${API_BASE}/claims/upload`;
+
+  const response = await fetch(url, {
     method: "POST",
     body: formData,
   });

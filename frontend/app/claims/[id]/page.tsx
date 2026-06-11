@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Copy,
   Download,
   Info,
   Loader2,
@@ -32,6 +34,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { PipelineDiagram } from "@/components/pipeline-diagram";
 
 export default function ClaimDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
@@ -43,6 +46,7 @@ export default function ClaimDetailPage(): React.ReactElement {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [isDone, setIsDone] = useState(false);
   const [appealOpen, setAppealOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
   const isDoneRef = useRef(false);
@@ -165,6 +169,18 @@ export default function ClaimDetailPage(): React.ReactElement {
 
   const riskPercent = Math.round(claim.denialRisk * 100);
 
+  // Derive pipeline state from agent events for the diagram
+  const completedAgents = events
+    .filter((e) => e.event === "completed")
+    .map((e) => e.agent)
+    .filter((a) => a !== "system");
+
+  const lastEvent = events[events.length - 1];
+  const activeAgent =
+    !isDone && lastEvent && lastEvent.event === "started"
+      ? lastEvent.agent
+      : null;
+
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -179,6 +195,14 @@ export default function ClaimDetailPage(): React.ReactElement {
         <Badge variant={statusBadgeVariant(claim.status)}>
           {formatStatus(claim.status)}
         </Badge>
+      </div>
+
+      <div className="mb-6">
+        <PipelineDiagram
+          activeAgent={activeAgent}
+          completedAgents={completedAgents}
+          status={claim.status}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -306,6 +330,26 @@ export default function ClaimDetailPage(): React.ReactElement {
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                     {claim.appealLetter}
                   </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 w-full"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(claim.appealLetter);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="size-3.5 mr-1.5" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-3.5 mr-1.5" /> Copy Appeal Letter
+                      </>
+                    )}
+                  </Button>
                 </CardContent>
               )}
             </Card>

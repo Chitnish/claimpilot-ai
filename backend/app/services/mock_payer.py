@@ -35,9 +35,9 @@ def check_eligibility(payer_name: str, member_id: str) -> dict:
     }
 
 
-def submit_claim(claim_id: str, total_charge: float) -> dict:
+def submit_claim(claim_id: str, total_charge: float, force_deny: bool = False) -> dict:
     """Simulate clearinghouse submission. 20% chance of denial."""
-    denied = random.random() < 0.20
+    denied = force_deny or random.random() < 0.20
     return {
         "clearinghouse_ref": f"CLH-{uuid.uuid4().hex[:8].upper()}",
         "accepted": not denied,

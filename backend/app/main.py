@@ -22,6 +22,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # In-memory store for SSE streaming (replaced by DB pub/sub in Phase 3)
 _claim_events: dict[str, list[dict]] = {}
 _claim_states: dict[str, ClaimState] = {}
+_demo_claims: set[str] = set()
 
 
 class ResumeDecision(BaseModel):
@@ -57,7 +58,7 @@ async def health():
 
 
 @app.post("/claims/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), demo: bool = False):
     """Accept a superbill upload and run the full pipeline."""
     claim_id = str(uuid.uuid4())
     suffix = Path(file.filename).suffix or ".png"
@@ -88,7 +89,10 @@ async def upload_document(file: UploadFile = File(...)):
         claim_id=claim_id,
         org_id=org_id,
         document_storage_path=str(dest),
+        demo_mode=demo,
     )
+    if demo:
+        _demo_claims.add(claim_id)
     _claim_events[claim_id] = []
     _claim_states[claim_id] = initial_state
 

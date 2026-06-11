@@ -11,6 +11,8 @@ const AGENT_COLORS: Record<string, string> = {
   scrub: "bg-orange-100 text-orange-800 border-orange-200",
   submission: "bg-red-100 text-red-800 border-red-200",
   reconciliation: "bg-green-100 text-green-800 border-green-200",
+  fraud: "border-gray-300 bg-gray-50 text-gray-700",
+  human_review: "border-amber-300 bg-amber-50 text-amber-700",
   system: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
