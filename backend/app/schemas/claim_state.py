@@ -94,7 +94,6 @@ class ClaimState(BaseModel):
     status: ClaimStatus = ClaimStatus.DRAFT
     needs_human_review: bool = False
     review_reason: str = ""
-    demo_mode: bool = False
 
     # Trace log (drives live feed)
     agent_events: list[AgentEvent] = Field(default_factory=list)

@@ -26,7 +26,7 @@ async def run(state: ClaimState) -> ClaimState:
         summary=f"Submitting claim ${state.total_charge:.2f} to clearinghouse.",
     ))
 
-    result = submit_claim(state.claim_id, state.total_charge, force_deny=state.demo_mode)
+    result = submit_claim(state.claim_id, state.total_charge)
     state.clearinghouse_ref = result["clearinghouse_ref"]
 
     if result["denied"]:

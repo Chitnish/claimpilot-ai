@@ -22,7 +22,6 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # In-memory store for SSE streaming (replaced by DB pub/sub in Phase 3)
 _claim_events: dict[str, list[dict]] = {}
 _claim_states: dict[str, ClaimState] = {}
-_demo_claims: set[str] = set()
 
 
 class ResumeDecision(BaseModel):
@@ -58,7 +57,7 @@ async def health():
 
 
 @app.post("/claims/upload")
-async def upload_document(file: UploadFile = File(...), demo: bool = False):
+async def upload_document(file: UploadFile = File(...)):
     """Accept a superbill upload and run the full pipeline."""
     claim_id = str(uuid.uuid4())
     suffix = Path(file.filename).suffix or ".png"
@@ -89,10 +88,7 @@ async def upload_document(file: UploadFile = File(...), demo: bool = False):
         claim_id=claim_id,
         org_id=org_id,
         document_storage_path=str(dest),
-        demo_mode=demo,
     )
-    if demo:
-        _demo_claims.add(claim_id)
     _claim_events[claim_id] = []
     _claim_states[claim_id] = initial_state
 
@@ -353,6 +349,67 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
         state.status = ClaimStatus.NEEDS_REVIEW
         state.needs_human_review = True
         _claim_states[claim_id] = state
+        # On rejection: treat as payer denial and draft appeal letter
+        async def _draft_rejection_appeal():
+            try:
+                from app.services.llm import text_call, MODEL_REASONING
+                from app.services.resend_client import send_appeal_email
+                from app.agents.submission import APPEAL_SYSTEM
+                lines_text = "\n".join(
+                    f"  - CPT {ln.cpt_code}: ICD-10 {', '.join(ln.icd10_codes)}, ${ln.charge:.2f}"
+                    for ln in state.claim_lines
+                ) if state.claim_lines else "  - See claim on file"
+                appeal_prompt = f"""
+Claim Reference: {state.claim_id[:8].upper()}
+Patient: {state.patient_name}, DOB {state.patient_dob}
+Provider: {state.provider_name} (NPI {state.provider_npi})
+Date of Service: {state.date_of_service}
+Payer: {state.payer_name}
+
+Denial Reason: High denial risk ({state.denial_risk:.0%}) - claim flagged for medical necessity review.
+Risk Factors: {', '.join(state.denial_risk_factors)}
+
+Claim Lines:
+{lines_text}
+
+Draft a complete appeal letter arguing medical necessity."""
+                appeal_text, _ = await text_call(
+                    model=MODEL_REASONING,
+                    system=APPEAL_SYSTEM,
+                    user=appeal_prompt,
+                )
+                state.appeal_letter = appeal_text
+                state.carc_code = "50"
+                state.status = ClaimStatus.APPEALED
+                _claim_states[claim_id] = state
+                # Update SSE buffer
+                _claim_events[claim_id].append({
+                    "agent": "submission", "event": "completed",
+                    "summary": f"Claim rejected by reviewer. Appeal letter drafted ({len(appeal_text.split())} words) citing medical necessity. Sending appeal email.",
+                })
+                await send_appeal_email(
+                    claim_id=state.claim_id,
+                    patient_name=state.patient_name,
+                    payer_name=state.payer_name,
+                    carc_code="50",
+                    appeal_letter=appeal_text,
+                )
+                # Update DB
+                try:
+                    get_supabase().table("claims").update({
+                        "status": "appealed",
+                        "appeal_letter": appeal_text,
+                        "carc_code": "50",
+                    }).eq("id", claim_id).execute()
+                except Exception as db_err:
+                    print(f"[reject] DB update error: {db_err}")
+                _claim_events[claim_id].append({
+                    "agent": "system", "event": "done",
+                    "summary": "Pipeline complete.",
+                })
+            except Exception as e:
+                print(f"[reject] appeal draft error: {e}")
+        asyncio.create_task(_draft_rejection_appeal())
 
     review_status = "approved" if decision.approved else "rejected"
     try:
