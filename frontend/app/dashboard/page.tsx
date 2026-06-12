@@ -241,6 +241,9 @@ export default function DashboardPage(): React.ReactElement {
                   ? `${stats.avgProcessingSeconds}s`
                   : `${Math.floor(stats.avgProcessingSeconds / 60)}m ${stats.avgProcessingSeconds % 60}s`}
             </p>
+            <p className="text-xs text-muted-foreground">
+              Industry avg: 3-5 days
+            </p>
           </CardContent>
         </Card>
 
