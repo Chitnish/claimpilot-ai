@@ -101,11 +101,18 @@ def make_superbill(out_dir: str = "data/synthetic") -> str:
     y -= 0.28*inch
 
     # One E/M visit + 1-2 ancillary services, like a real primary-care superbill.
-    cpts = [random.choice(E_AND_M)] + random.sample(ANCILLARY, k=random.randint(1, 2))
+    # 99000 weighted low — most practices rarely bill it (it trips NCCI edits).
+    n_anc = random.randint(1, 2)
+    anc: list[str] = []
+    while len(anc) < n_anc:
+        pick = random.choices(ANCILLARY, weights=[0.34, 0.30, 0.30, 0.06])[0]
+        if pick not in anc:
+            anc.append(pick)
+    cpts = [random.choice(E_AND_M)] + anc
     has_ecg = "93000" in cpts
-    # 60% of E/M lines billed with an ECG carry the required modifier 25 —
+    # Most E/M lines billed with an ECG carry the required modifier 25 —
     # the rest will (correctly) trip the scrubber/payer bundling edit.
-    em_mods = ["25"] if has_ecg and random.random() < 0.6 else []
+    em_mods = ["25"] if has_ecg and random.random() < 0.75 else []
 
     total = 0.0
     c.setFillColor(colors.black)

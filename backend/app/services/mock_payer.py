@@ -188,7 +188,7 @@ def check_eligibility(payer_name: str, member_id: str) -> dict:
     rules = _payer_rules(payer_name)
     roll = _stable_pct("elig", payer_name, member_id)
 
-    if roll < 0.07:
+    if roll < 0.04:
         return {
             "active": False,
             "plan_name": f"{payer_name} (coverage terminated)",
@@ -214,7 +214,7 @@ def check_eligibility(payer_name: str, member_id: str) -> dict:
         "deductible_total": _money(tier["deductible_total"]),
         "deductible_remaining": _money(remaining),
         "prior_auth_cpts": list(rules["auth_cpts"]),
-        "prior_auth_on_file": _stable_pct("auth", member_id) < 0.75,
+        "prior_auth_on_file": _stable_pct("auth", member_id) < 0.85,
         "termination_note": "",
     }
 

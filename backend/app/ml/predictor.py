@@ -1,9 +1,12 @@
-"""Load trained ML models and run denial-risk / anomaly inference."""
+"""Load trained ML models and run denial-risk / anomaly inference.
 
+SHAP attributions are translated into billing-specialist language with an
+approximate probability impact, e.g.:
+  "Modifier 25 missing on E/M billed with same-day procedure (+24% risk)"
+"""
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 from pathlib import Path
 
 import joblib
@@ -11,22 +14,14 @@ import numpy as np
 import pandas as pd
 import shap
 
+from app.ml.features import claim_features, feature_frame
+
 ML_DIR = Path(__file__).resolve().parent
 
 _denial_artifact: dict | None = None
 _anomaly_model = None
 _denial_loaded = False
 _anomaly_loaded = False
-
-NUMERIC_COLS = [
-    "has_modifier",
-    "coding_issues",
-    "npi_valid",
-    "charge_amount",
-    "prior_auth_required",
-    "num_dx_codes",
-    "date_of_service_month",
-]
 
 
 def _ensure_denial_loaded() -> None:
@@ -55,102 +50,75 @@ def _ensure_anomaly_loaded() -> None:
         _anomaly_model = None
 
 
-def _parse_service_month(date_str: str) -> int:
-    if not date_str:
-        return 6
-    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(date_str.strip()[:10], fmt).month
-        except ValueError:
-            continue
-    return 6
+def _describe_feature(name: str, value: float, increases_risk: bool) -> str:
+    """Plain-English description of a feature's contribution."""
+    if name == "em_mod25_missing":
+        return ("Modifier 25 missing on E/M billed with same-day procedure"
+                if value else "No modifier-25 bundling conflicts")
+    if name == "bundled_99000":
+        return ("Specimen handling (99000) bundled into E/M — NCCI edit"
+                if value else "No NCCI bundling conflicts")
+    if name == "unsupported_dx_lines":
+        return (f"{int(value)} line(s) where diagnosis does not support the procedure (LCD policy)"
+                if value else "All diagnoses support the billed procedures")
+    if name == "units_over_mue":
+        return ("Units exceed the Medically Unlikely Edit maximum"
+                if value else "Units within MUE limits")
+    if name == "npi_valid":
+        return ("Provider NPI passes check-digit validation"
+                if value else "Provider NPI fails check-digit validation")
+    if name == "member_id_present":
+        return ("Member ID present" if value else "Member ID missing")
+    if name == "auth_required_cpt_present":
+        return ("Claim includes a service this payer requires prior authorization for"
+                if value else "No prior-auth-required services on claim")
+    if name == "near_filing_limit":
+        return ("Claim is near or past the payer's timely filing limit"
+                if value else "Well within timely filing limit")
+    if name == "dos_age_days":
+        return f"Claim age: {int(value)} days since date of service"
+    if name == "charge_amount":
+        return f"Total billed charge ${value:,.2f}"
+    if name == "num_lines":
+        return f"{int(value)} service line(s) on claim"
+    if name == "num_dx_codes":
+        return f"{int(value)} distinct diagnosis code(s)"
+    if name.startswith("payer_"):
+        payer = name.removeprefix("payer_").title()
+        return f"Payer mix: {payer}" if value else f"Payer is not {payer}"
+    if name.startswith("cpt_"):
+        cpt = name.removeprefix("cpt_")
+        return f"CPT {cpt} on claim" if value else f"No CPT {cpt} on claim"
+    return name.replace("_", " ").title()
 
 
-def _extract_claim_fields(state_dict: dict) -> tuple[str, int, int]:
-    """Return (cpt_code, has_modifier, num_dx_codes) from claim lines."""
-    claim_lines = state_dict.get("claim_lines", [])
-    cpt_code = "99213"
-    has_modifier = 0
-    dx_codes: set[str] = set()
-
-    if claim_lines:
-        first_line = claim_lines[0]
-        if isinstance(first_line, dict):
-            cpt_code = first_line.get("cpt_code", "99213")
-        else:
-            cpt_code = getattr(first_line, "cpt_code", "99213")
-
-    for line in claim_lines:
-        if isinstance(line, dict):
-            modifiers = line.get("modifiers", [])
-            icd10_codes = line.get("icd10_codes", [])
-        else:
-            modifiers = getattr(line, "modifiers", [])
-            icd10_codes = getattr(line, "icd10_codes", [])
-        if modifiers:
-            has_modifier = 1
-        dx_codes.update(icd10_codes)
-
-    return cpt_code, has_modifier, len(dx_codes)
+def _sigmoid(x: float) -> float:
+    return float(1 / (1 + np.exp(-x)))
 
 
-def _format_feature_name(name: str) -> str:
-    label = name.replace("payer_", "Payer: ").replace("cpt_", "CPT: ")
-    label = label.replace("_", " ")
-    return label.title()
-
-
-def build_feature_vector(state_dict: dict) -> pd.DataFrame:
-    _ensure_denial_loaded()
-    if _denial_artifact is None:
-        raise RuntimeError("Denial model artifact not loaded")
-
-    feature_columns: list[str] = _denial_artifact["feature_columns"]
-    cpt_code, has_modifier, num_dx_codes = _extract_claim_fields(state_dict)
-
-    row = pd.DataFrame(
-        [
-            {
-                "payer_name": state_dict.get("payer_name", ""),
-                "cpt_code": cpt_code,
-                "has_modifier": has_modifier,
-                "coding_issues": len(state_dict.get("coding_issues", [])),
-                "npi_valid": 1 if len(state_dict.get("provider_npi", "")) == 10 else 0,
-                "charge_amount": state_dict.get("total_charge", 0.0),
-                "prior_auth_required": 0,
-                "num_dx_codes": num_dx_codes,
-                "date_of_service_month": _parse_service_month(
-                    state_dict.get("date_of_service", "")
-                ),
-            }
-        ]
-    )
-
-    payer_dummies = pd.get_dummies(row["payer_name"], prefix="payer")
-    cpt_dummies = pd.get_dummies(row["cpt_code"], prefix="cpt")
-    X = pd.concat([row[NUMERIC_COLS], payer_dummies, cpt_dummies], axis=1)
-    return X.reindex(columns=feature_columns, fill_value=0)
-
-
-def _compute_shap_explanations(model, X: pd.DataFrame) -> list[str]:
+def _compute_explanations(model, X: pd.DataFrame) -> list[str]:
     explainer = shap.TreeExplainer(model)
-    shap_values = explainer(X)
+    sv = explainer(X)
+    vals = sv.values[0] if hasattr(sv, "values") else np.asarray(sv)[0]
+    base = float(sv.base_values[0]) if hasattr(sv, "base_values") else 0.0
 
-    if hasattr(shap_values, "values"):
-        vals = shap_values.values[0]
-    elif isinstance(shap_values, list):
-        vals = shap_values[1][0]
-    else:
-        vals = shap_values[0]
+    f_total = base + float(np.sum(vals))
+    p_total = _sigmoid(f_total)
 
     feature_names = X.columns.tolist()
-    top_indices = np.argsort(np.abs(vals))[-3:][::-1]
+    row = X.iloc[0]
+    top = np.argsort(np.abs(vals))[-3:][::-1]
 
-    explanations: list[str] = []
-    for idx in top_indices:
-        name = _format_feature_name(feature_names[idx])
-        explanations.append(f"{name}: {vals[idx]:+.2f}")
-    return explanations
+    out: list[str] = []
+    for idx in top:
+        phi = float(vals[idx])
+        if abs(phi) < 1e-6:
+            continue
+        # Local approximation: probability with vs. without this feature's contribution.
+        delta_p = p_total - _sigmoid(f_total - phi)
+        desc = _describe_feature(feature_names[idx], float(row.iloc[idx]), phi > 0)
+        out.append(f"{desc} ({delta_p:+.0%} risk)")
+    return out or ["No significant risk factors identified"]
 
 
 async def predict_denial_risk(state_dict: dict) -> tuple[float, list[str]]:
@@ -159,12 +127,14 @@ async def predict_denial_risk(state_dict: dict) -> tuple[float, list[str]]:
         return (0.5, ["Model not loaded"])
 
     try:
-        X = build_feature_vector(state_dict)
+        X = feature_frame([claim_features(state_dict)])
+        X = X.reindex(columns=_denial_artifact["feature_columns"], fill_value=0)
         model = _denial_artifact["model"]
         risk_score = float(model.predict_proba(X)[:, 1][0])
-        explanations = await asyncio.to_thread(_compute_shap_explanations, model, X)
+        explanations = await asyncio.to_thread(_compute_explanations, model, X)
         return (risk_score, explanations)
-    except Exception:
+    except Exception as exc:
+        print(f"[predictor] denial inference error: {exc}")
         return (0.5, ["Prediction error"])
 
 
@@ -174,18 +144,15 @@ def score_anomaly(state_dict: dict) -> float:
         return 0.0
 
     try:
-        _, has_modifier, num_dx_codes = _extract_claim_fields(state_dict)
-        features = np.array(
-            [
-                [
-                    state_dict.get("total_charge", 0.0),
-                    len(state_dict.get("coding_issues", [])),
-                    num_dx_codes,
-                    has_modifier,
-                ]
-            ]
-        )
+        feats = claim_features(state_dict)
+        features = pd.DataFrame([{
+            "charge_amount": feats["charge_amount"],
+            "num_lines": feats["num_lines"],
+            "num_dx_codes": feats["num_dx_codes"],
+            "units_over_mue": feats["units_over_mue"],
+        }])
         raw_score = _anomaly_model.decision_function(features)[0]
         return float(1 / (1 + np.exp(raw_score)))
-    except Exception:
+    except Exception as exc:
+        print(f"[predictor] anomaly inference error: {exc}")
         return 0.0
