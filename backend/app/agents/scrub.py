@@ -1,10 +1,17 @@
 ﻿"""
-Claim Scrub Agent — runs rules-based scrubber and generates CMS-1500 PDF.
+Claim Scrub Agent — runs the full pre-submission scrubber (identifiers, code
+validity, NCCI/MUE/modifier edits, filing limits, prior auth, LCD necessity),
+scores ML denial risk, and generates the CMS-1500 PDF.
+
+Two human-review gates:
+  - Hard scrub errors block submission (the claim WILL deny as-is)
+  - High ML denial risk above threshold flags for review
 """
 from __future__ import annotations
 import os, time
 from pathlib import Path
 from app.schemas.claim_state import ClaimState, AgentEvent, ClaimStatus
+from app.rules.scrubber import scrub_claim
 from app.services.supabase_client import log_agent_event
 from app.pdf.cms1500 import generate_cms1500
 
@@ -12,37 +19,23 @@ from app.pdf.cms1500 import generate_cms1500
 DENIAL_RISK_THRESHOLD = float(os.getenv("DENIAL_RISK_THRESHOLD", "0.60"))
 
 
-def _scrub_rules(state: ClaimState) -> list[str]:
-    issues = []
-    if not state.provider_npi or len(state.provider_npi) != 10:
-        issues.append("Provider NPI missing or not 10 digits")
-    if not state.patient_member_id:
-        issues.append("Patient member ID missing")
-    if not state.date_of_service:
-        issues.append("Date of service missing")
-    if not state.claim_lines:
-        issues.append("No claim lines present")
-    for ln in state.claim_lines:
-        if not ln.icd10_codes:
-            issues.append(f"Line {ln.line_no}: no diagnosis codes")
-        if ln.charge <= 0:
-            issues.append(f"Line {ln.line_no}: invalid charge ${ln.charge}")
-    return issues
-
-
 async def run(state: ClaimState) -> ClaimState:
     t0 = time.monotonic()
 
     state.agent_events.append(AgentEvent(
         agent="scrub", event="started",
-        summary="Running claim scrubber against payer rules.",
+        summary="Running pre-submission scrubber: identifiers, NCCI/MUE edits, modifiers, filing limits, coverage policy.",
     ))
 
-    issues = _scrub_rules(state)
-    state.scrub_issues = issues
-    state.scrub_passed = len(issues) == 0
+    findings = scrub_claim(state)
+    errors = [f for f in findings if f.severity == "error"]
+    warnings = [f for f in findings if f.severity == "warning"]
 
-    # Real ML denial risk prediction (Phase 4)
+    state.scrub_findings = findings
+    state.scrub_issues = [f"[{f.rule}] {f.message}" for f in errors]
+    state.scrub_passed = not errors
+
+    # ML denial risk prediction
     try:
         from app.ml.predictor import predict_denial_risk
         risk_score, shap_factors = await predict_denial_risk(state.model_dump())
@@ -62,43 +55,77 @@ async def run(state: ClaimState) -> ClaimState:
 
     latency_ms = int((time.monotonic() - t0) * 1000)
 
-    if issues:
-        summary = f"Scrubber flagged {len(issues)} issue(s): {issues[0]}. CMS-1500 generated with warnings."
-    else:
-        summary = f"Claim passed all scrub rules. CMS-1500 generated at {pdf_path.name}. Denial risk: {state.denial_risk:.0%}."
+    already_reviewed = bool(state.review_reason) and (
+        "denial risk" in state.review_reason.lower()
+        or "scrub" in state.review_reason.lower()
+    )
 
-    # High denial risk gate — only flag if not already reviewed
-    already_reviewed = "denial risk" in state.review_reason.lower() if state.review_reason else False
-    if state.denial_risk >= DENIAL_RISK_THRESHOLD and not state.needs_human_review and not already_reviewed:
-        state.needs_human_review = True
-        state.review_reason = f"Denial risk {state.denial_risk:.0%} exceeds threshold"
-        state.status = ClaimStatus.NEEDS_REVIEW
+    if errors:
+        first = errors[0]
+        summary = (
+            f"Scrubber BLOCKED submission — {len(errors)} hard error(s), {len(warnings)} warning(s). "
+            f"First: [{first.rule}] {first.message[:110]}"
+        )
+    elif warnings:
+        summary = (
+            f"Scrub passed with {len(warnings)} warning(s) — claim is submittable. "
+            f"CMS-1500 generated. ML denial risk: {state.denial_risk:.0%}."
+        )
+    else:
+        summary = (
+            f"Clean scrub — all {len(state.claim_lines)} line(s) pass NCCI, MUE, modifier, "
+            f"identifier, and coverage edits. CMS-1500 generated. ML denial risk: {state.denial_risk:.0%}."
+        )
+
+    review_reason = ""
+    if errors and not state.needs_human_review and not already_reviewed:
+        review_reason = f"Scrubber blocked submission: {len(errors)} hard error(s) — [{errors[0].rule}] {errors[0].message[:90]}"
+    elif (
+        state.denial_risk >= DENIAL_RISK_THRESHOLD
+        and not state.needs_human_review
+        and not already_reviewed
+    ):
+        review_reason = f"Denial risk {state.denial_risk:.0%} exceeds threshold"
         summary += f" ⚠ High denial risk ({state.denial_risk:.0%}) — flagged for review."
+
+    if review_reason:
+        state.needs_human_review = True
+        state.review_reason = review_reason
+        state.status = ClaimStatus.NEEDS_REVIEW
         from app.services.supabase_client import get_supabase
         try:
             get_supabase().table("review_queue").insert({
                 "org_id": state.org_id,
                 "claim_id": state.claim_id,
                 "reason": state.review_reason,
-                "details": {"denial_risk": state.denial_risk, "low_confidence_fields": []},
+                "details": {
+                    "denial_risk": state.denial_risk,
+                    "scrub_errors": [f"[{f.rule}] {f.message}" for f in errors],
+                    "scrub_warnings": [f"[{f.rule}] {f.message}" for f in warnings],
+                    "low_confidence_fields": state.low_confidence_fields,
+                },
                 "status": "open",
             }).execute()
         except Exception as e:
             print(f"[scrub] review_queue insert error: {e}")
 
+    payload = {
+        "errors": [f"[{f.rule}] {f.message}" for f in errors],
+        "warnings": [f"[{f.rule}] {f.message}" for f in warnings],
+        "denial_risk": state.denial_risk,
+        "pdf": str(pdf_path),
+    }
     state.agent_events.append(AgentEvent(
         agent="scrub", event="completed",
         summary=summary,
-        payload={"issues": issues, "denial_risk": state.denial_risk, "pdf": str(pdf_path)},
+        payload=payload,
         latency_ms=latency_ms,
     ))
     await log_agent_event(
         state.claim_id, state.org_id, "scrub", "completed",
-        summary, {"issues": issues, "denial_risk": state.denial_risk}, latency_ms,
+        summary, payload, latency_ms,
     )
 
-    if not state.needs_human_review:
-        state.status = ClaimStatus.SCRUBBED
-    elif already_reviewed:
+    if not state.needs_human_review or already_reviewed:
         state.status = ClaimStatus.SCRUBBED
     return state

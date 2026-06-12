@@ -12,7 +12,6 @@ from reportlab.lib import colors
 
 # Sample synthetic data pools
 PAYERS  = ["BlueCross BlueShield", "Aetna PPO", "United HealthCare", "Cigna", "Humana"]
-DX      = ["E11.9", "I10", "J06.9", "M54.5", "Z00.00", "F41.1", "E78.5"]
 CPT_MAP = {
     "99213": ("Office visit, est. patient, moderate complexity", 185.00),
     "99214": ("Office visit, est. patient, high complexity",     250.00),
@@ -20,6 +19,26 @@ CPT_MAP = {
     "85025": ("Complete CBC with differential",                   45.00),
     "80053": ("Comprehensive metabolic panel",                    52.00),
     "99000": ("Specimen handling fee",                            15.00),
+}
+
+E_AND_M = ["99213", "99214"]
+ANCILLARY = ["93000", "85025", "80053", "99000"]
+
+# Clinically plausible diagnoses per CPT (matches payer coverage policy) and
+# implausible ones (will trip LCD edits) — mixed deliberately so generated
+# claims include both clean and deniable examples.
+DX_SUPPORTED = {
+    "99213": ["E11.9", "I10", "J06.9", "M54.5", "F41.1", "E78.5", "Z00.00"],
+    "99214": ["E11.9", "I10", "J06.9", "M54.5", "F41.1", "E78.5"],
+    "93000": ["I10", "R00.0", "R07.9", "E11.9"],
+    "85025": ["D64.9", "R50.9", "J06.9", "E11.9"],
+    "80053": ["E11.9", "E78.5", "I10"],
+    "99000": ["E11.9", "I10", "E78.5"],
+}
+DX_UNSUPPORTED = {
+    "93000": ["M54.5", "Z00.00", "F41.1"],
+    "85025": ["M54.5", "F41.1"],
+    "80053": ["M54.5", "J06.9", "F41.1"],
 }
 
 def make_superbill(out_dir: str = "data/synthetic") -> str:
@@ -47,9 +66,10 @@ def make_superbill(out_dir: str = "data/synthetic") -> str:
     first = random.choice(["James","Maria","David","Sarah","Kevin","Linda","Robert","Patricia"])
     last  = random.choice(["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis"])
     dob   = f"{random.randint(1950,2000)}-{random.randint(1,12):02d}-{random.randint(1,28):02d}"
-    mid   = f"{random.choice(PAYERS[:3]).replace(' ','')[:4].upper()}{random.randint(100000,999999)}"
     payer = random.choice(PAYERS)
-    dos   = "2026-06-10"
+    mid   = f"{payer.replace(' ','')[:4].upper()}{random.randint(100000,999999)}"
+    from datetime import date, timedelta
+    dos   = (date.today() - timedelta(days=random.randint(1, 10))).isoformat()
     npi   = "1234567893"  # checksum-valid synthetic NPI (passes Luhn w/ 80840 prefix)
     provider = "Dr. Emily Carter MD"
 
@@ -76,16 +96,28 @@ def make_superbill(out_dir: str = "data/synthetic") -> str:
     c.rect(0.4*inch, y, W - 0.8*inch, 0.28*inch, fill=1, stroke=0)
     c.setFillColor(colors.HexColor("#1e3a5f"))
     c.setFont("Helvetica-Bold", 8)
-    for x, hdr in [(0.5, "CPT"), (1.1, "DESCRIPTION"), (4.2, "ICD-10"), (5.3, "UNITS"), (6.0, "CHARGE")]:
+    for x, hdr in [(0.5, "CPT"), (1.05, "MOD"), (1.5, "DESCRIPTION"), (4.2, "ICD-10"), (5.4, "UNITS"), (6.0, "CHARGE")]:
         c.drawString(x*inch, y + 8, hdr)
     y -= 0.28*inch
 
-    cpts = random.sample(list(CPT_MAP.keys()), k=random.randint(2, 3))
+    # One E/M visit + 1-2 ancillary services, like a real primary-care superbill.
+    cpts = [random.choice(E_AND_M)] + random.sample(ANCILLARY, k=random.randint(1, 2))
+    has_ecg = "93000" in cpts
+    # 60% of E/M lines billed with an ECG carry the required modifier 25 —
+    # the rest will (correctly) trip the scrubber/payer bundling edit.
+    em_mods = ["25"] if has_ecg and random.random() < 0.6 else []
+
     total = 0.0
     c.setFillColor(colors.black)
     for i, cpt in enumerate(cpts):
         desc, charge = CPT_MAP[cpt]
-        dx = random.sample(DX, k=random.randint(1, 2))
+        # 80% clinically supported dx; 20% draw an unsupported dx (LCD denial bait)
+        unsupported = DX_UNSUPPORTED.get(cpt)
+        if unsupported and random.random() < 0.20:
+            dx = [random.choice(unsupported)]
+        else:
+            dx = random.sample(DX_SUPPORTED[cpt], k=min(random.randint(1, 2), len(DX_SUPPORTED[cpt])))
+        mods = em_mods if cpt in E_AND_M else []
         total += charge
         fill = colors.HexColor("#f7f9fc") if i % 2 == 0 else colors.white
         c.setFillColor(fill)
@@ -93,9 +125,10 @@ def make_superbill(out_dir: str = "data/synthetic") -> str:
         c.setFillColor(colors.black)
         c.setFont("Helvetica", 8)
         c.drawString(0.5*inch,  y+7, cpt)
-        c.drawString(1.1*inch,  y+7, desc[:38])
+        c.drawString(1.05*inch, y+7, ",".join(mods))
+        c.drawString(1.5*inch,  y+7, desc[:33])
         c.drawString(4.2*inch,  y+7, ", ".join(dx))
-        c.drawString(5.3*inch,  y+7, "1")
+        c.drawString(5.4*inch,  y+7, "1")
         c.drawString(6.0*inch,  y+7, f"${charge:.2f}")
         y -= 0.27*inch
 

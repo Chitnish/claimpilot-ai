@@ -15,7 +15,8 @@ For each header field (patient_name, patient_dob, patient_member_id, payer_name,
 provider_name, provider_npi, date_of_service) include a confidence score 0.0-1.0
 in the confidence dict, keyed by field name.
 If a field is missing or illegible, use an empty string and confidence 0.0.
-For each CPT line, validate that at least one ICD-10 code is present."""
+For each CPT line, capture any modifiers (e.g. 25, 59) from the MOD column —
+an empty list if none — and validate that at least one ICD-10 code is present."""
 
 
 def _to_base64_image(doc_path: str) -> tuple[str, str]:

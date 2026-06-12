@@ -26,6 +26,13 @@ class AgentEvent(BaseModel):
     latency_ms: int = 0
 
 
+class ScrubFinding(BaseModel):
+    severity: str            # error | warning
+    rule: str                # rule id, e.g. NPI-03, NCCI-01, MOD-25
+    message: str             # billing-specialist-readable explanation
+    line_no: int | None = None
+
+
 class ClaimLine(BaseModel):
     line_no: int
     cpt_code: str
@@ -71,7 +78,8 @@ class ClaimState(BaseModel):
     # Claim / scrub
     total_charge: float = 0.0
     cms1500_path: str = ""          # storage path of generated PDF
-    scrub_issues: list[str] = Field(default_factory=list)
+    scrub_findings: list[ScrubFinding] = Field(default_factory=list)
+    scrub_issues: list[str] = Field(default_factory=list)   # legacy flat strings (errors only)
     scrub_passed: bool = False
 
     # Denial risk
