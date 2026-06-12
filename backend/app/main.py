@@ -282,6 +282,151 @@ async def claim_history(claim_id: str):
     return _history_from_db(claim_id)
 
 
+@app.get("/claims/search")
+async def search_claims(
+    q: str = "",
+    status: str = "",
+    payer: str = "",
+    limit: int = 20,
+    offset: int = 0,
+):
+    """Paginated claims work list with text search and status/payer filters."""
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    try:
+        query = (
+            get_supabase()
+            .table("claims")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(500)
+        )
+        if status:
+            query = query.eq("status", status)
+        if payer:
+            query = query.ilike("payer_name", f"%{payer}%")
+        rows = query.execute().data or []
+
+        if q:
+            needle = q.strip().lower()
+            rows = [
+                r for r in rows
+                if needle in str(r.get("id") or "").lower()
+                or needle in (r.get("payer_name") or "").lower()
+                or needle in (r.get("carc_code") or "").lower()
+            ]
+
+        payer_rows = (
+            get_supabase().table("claims").select("payer_name").limit(500).execute()
+        )
+        payers = sorted({
+            r["payer_name"] for r in (payer_rows.data or []) if r.get("payer_name")
+        })
+
+        return {
+            "items": rows[offset:offset + limit],
+            "total": len(rows),
+            "limit": limit,
+            "offset": offset,
+            "facets": {"payers": payers},
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/analytics")
+async def analytics():
+    """Billing-department analytics computed over the claims table."""
+    from collections import Counter
+    from app.services.mock_payer import CARC_DESCRIPTIONS
+
+    try:
+        rows = (
+            get_supabase()
+            .table("claims")
+            .select("status, payer_name, total_charge, denial_risk, carc_code, created_at")
+            .order("created_at", desc=True)
+            .limit(1000)
+            .execute()
+        ).data or []
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    total_claims = len(rows)
+    total_billed = round(sum(r.get("total_charge") or 0.0 for r in rows), 2)
+
+    status_counts = Counter((r.get("status") or "unknown") for r in rows)
+    submitted_like = {"submitted", "denied", "appealed", "paid", "reconciled"}
+    adjudicated = [r for r in rows if (r.get("status") or "") in submitted_like]
+    denied = [r for r in adjudicated if (r.get("status") or "") in ("denied", "appealed")]
+    denial_rate = round(len(denied) / len(adjudicated), 4) if adjudicated else 0.0
+
+    risks = [r.get("denial_risk") for r in rows if r.get("denial_risk") is not None]
+    avg_denial_risk = round(sum(risks) / len(risks), 4) if risks else 0.0
+
+    carc_counter = Counter(
+        (r.get("carc_code") or "") for r in rows if r.get("carc_code")
+    )
+    top_denial_reasons = [
+        {
+            "carc_code": code,
+            "description": CARC_DESCRIPTIONS.get(code, "Unknown adjustment reason"),
+            "count": count,
+        }
+        for code, count in carc_counter.most_common(8)
+    ]
+
+    payer_stats: dict[str, dict] = {}
+    for r in rows:
+        name = r.get("payer_name") or "Unknown"
+        entry = payer_stats.setdefault(
+            name, {"payer": name, "claims": 0, "billed": 0.0, "denied": 0}
+        )
+        entry["claims"] += 1
+        entry["billed"] = round(entry["billed"] + (r.get("total_charge") or 0.0), 2)
+        if (r.get("status") or "") in ("denied", "appealed"):
+            entry["denied"] += 1
+    payers = sorted(payer_stats.values(), key=lambda p: p["claims"], reverse=True)
+    for p in payers:
+        adjudicated_for_payer = [
+            r for r in rows
+            if (r.get("payer_name") or "Unknown") == p["payer"]
+            and (r.get("status") or "") in submitted_like
+        ]
+        p["denial_rate"] = (
+            round(p["denied"] / len(adjudicated_for_payer), 4)
+            if adjudicated_for_payer else 0.0
+        )
+
+    daily_counter: dict[str, dict] = {}
+    for r in rows:
+        day = (r.get("created_at") or "")[:10]
+        if not day:
+            continue
+        entry = daily_counter.setdefault(day, {"date": day, "claims": 0, "billed": 0.0})
+        entry["claims"] += 1
+        entry["billed"] = round(entry["billed"] + (r.get("total_charge") or 0.0), 2)
+    daily_volume = sorted(daily_counter.values(), key=lambda d: d["date"])[-14:]
+
+    high_risk_open = sum(
+        1 for r in rows
+        if (r.get("denial_risk") or 0) >= 0.6
+        and (r.get("status") or "") in ("draft", "extracted", "coded", "scrubbed", "needs_review")
+    )
+
+    return {
+        "total_claims": total_claims,
+        "total_billed": total_billed,
+        "denial_rate": denial_rate,
+        "avg_denial_risk": avg_denial_risk,
+        "high_risk_open": high_risk_open,
+        "status_counts": dict(status_counts),
+        "top_denial_reasons": top_denial_reasons,
+        "payers": payers,
+        "daily_volume": daily_volume,
+    }
+
+
 @app.get("/claims/{claim_id}")
 async def get_claim(claim_id: str):
     state = _get_state(claim_id)

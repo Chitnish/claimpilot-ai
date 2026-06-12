@@ -1,12 +1,16 @@
 import {
   agentEventSchema,
+  analyticsSchema,
   claimSchema,
+  claimSearchResponseSchema,
   claimsListSchema,
   resumeResponseSchema,
   reviewQueueSchema,
   uploadResponseSchema,
   type AgentEvent,
+  type Analytics,
   type Claim,
+  type ClaimSearchResponse,
   type ResumeResponse,
   type ReviewItem,
   type UploadResponse,
@@ -59,6 +63,43 @@ export async function listClaims(): Promise<Claim[]> {
   }
 
   return parseJson(response, claimsListSchema);
+}
+
+export interface ClaimSearchParams {
+  q?: string;
+  status?: string;
+  payer?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function searchClaims(
+  params: ClaimSearchParams,
+): Promise<ClaimSearchResponse> {
+  const query = new URLSearchParams();
+  if (params.q) query.set("q", params.q);
+  if (params.status) query.set("status", params.status);
+  if (params.payer) query.set("payer", params.payer);
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+
+  const response = await fetch(`${API_BASE}/claims/search?${query.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to search claims (${response.status})`);
+  }
+
+  return parseJson(response, claimSearchResponseSchema);
+}
+
+export async function getAnalytics(): Promise<Analytics> {
+  const response = await fetch(`${API_BASE}/analytics`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load analytics (${response.status})`);
+  }
+
+  return parseJson(response, analyticsSchema);
 }
 
 export function cms1500Url(claimId: string): string {

@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, LayoutDashboard, Upload } from "lucide-react";
+import {
+  BarChart3,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  Upload,
+} from "lucide-react";
 
 import { getReviewQueue } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -12,6 +18,8 @@ const REVIEW_POLL_INTERVAL_MS = 30_000;
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/claims", label: "Claims", icon: FileText },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/review", label: "Review", icon: ClipboardList, showBadge: true },
   { href: "/upload", label: "Upload", icon: Upload },
 ] as const;

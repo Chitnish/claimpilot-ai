@@ -283,3 +283,77 @@ export const resumeResponseSchema = z.object({
 });
 
 export type ResumeResponse = z.infer<typeof resumeResponseSchema>;
+
+export const claimSearchResponseSchema = z
+  .object({
+    items: z.array(claimSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+    facets: z.object({ payers: z.array(z.string()).default([]) }).default({ payers: [] }),
+  })
+  .transform((data) => ({
+    items: data.items,
+    total: data.total,
+    limit: data.limit,
+    offset: data.offset,
+    payers: data.facets.payers,
+  }));
+
+export type ClaimSearchResponse = z.infer<typeof claimSearchResponseSchema>;
+
+export const analyticsSchema = z
+  .object({
+    total_claims: z.number(),
+    total_billed: z.number(),
+    denial_rate: z.number(),
+    avg_denial_risk: z.number(),
+    high_risk_open: z.number(),
+    status_counts: z.record(z.string(), z.number()),
+    top_denial_reasons: z.array(
+      z.object({
+        carc_code: z.string(),
+        description: z.string(),
+        count: z.number(),
+      }),
+    ),
+    payers: z.array(
+      z.object({
+        payer: z.string(),
+        claims: z.number(),
+        billed: z.number(),
+        denied: z.number(),
+        denial_rate: z.number(),
+      }),
+    ),
+    daily_volume: z.array(
+      z.object({
+        date: z.string(),
+        claims: z.number(),
+        billed: z.number(),
+      }),
+    ),
+  })
+  .transform((data) => ({
+    totalClaims: data.total_claims,
+    totalBilled: data.total_billed,
+    denialRate: data.denial_rate,
+    avgDenialRisk: data.avg_denial_risk,
+    highRiskOpen: data.high_risk_open,
+    statusCounts: data.status_counts,
+    topDenialReasons: data.top_denial_reasons.map((r) => ({
+      carcCode: r.carc_code,
+      description: r.description,
+      count: r.count,
+    })),
+    payers: data.payers.map((p) => ({
+      payer: p.payer,
+      claims: p.claims,
+      billed: p.billed,
+      denied: p.denied,
+      denialRate: p.denial_rate,
+    })),
+    dailyVolume: data.daily_volume,
+  }));
+
+export type Analytics = z.infer<typeof analyticsSchema>;
