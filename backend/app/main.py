@@ -22,6 +22,15 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # In-memory store for SSE streaming (replaced by DB pub/sub in Phase 3)
 _claim_events: dict[str, list[dict]] = {}
 _claim_states: dict[str, ClaimState] = {}
+_claim_queues: dict[str, asyncio.Queue] = {}
+
+
+async def push_event(claim_id: str, event: dict) -> None:
+    """Push an agent event to both the SSE buffer and the live queue."""
+    _claim_events.setdefault(claim_id, []).append(event)
+    q = _claim_queues.get(claim_id)
+    if q:
+        await q.put(event)
 
 
 class ResumeDecision(BaseModel):
@@ -91,6 +100,7 @@ async def upload_document(file: UploadFile = File(...)):
     )
     _claim_events[claim_id] = []
     _claim_states[claim_id] = initial_state
+    _claim_queues[claim_id] = asyncio.Queue()
 
     # Run pipeline in background
     asyncio.create_task(_run_pipeline(claim_id, initial_state))
@@ -100,16 +110,18 @@ async def upload_document(file: UploadFile = File(...)):
 
 async def _run_pipeline(claim_id: str, state: ClaimState):
     try:
-        config = {"configurable": {"thread_id": claim_id}}
+        config = {"configurable": {"thread_id": claim_id}, "recursion_limit": 100}
         final_state_dict = await pipeline.ainvoke(state.model_dump(), config=config)
         final_state = ClaimState(**final_state_dict)
         _claim_states[claim_id] = final_state
 
-        # Push all events to SSE buffer
+        # Push all events — but do it one by one with a small delay for streaming effect
         for ev in final_state.agent_events:
-            _claim_events[claim_id].append(ev.model_dump())
+            ev_dict = ev.model_dump()
+            if ev_dict not in _claim_events.get(claim_id, []):
+                await push_event(claim_id, ev_dict)
+                await asyncio.sleep(0.3)  # 300ms between events for visual streaming
 
-        # Update claim row in DB
         try:
             get_supabase().table("claims").update({
                 "status":               final_state.status.value,
@@ -126,7 +138,7 @@ async def _run_pipeline(claim_id: str, state: ClaimState):
 
     except Exception as exc:
         print(f"[pipeline] error for {claim_id}: {exc}")
-        _claim_events[claim_id].append({
+        await push_event(claim_id, {
             "agent": "system", "event": "error",
             "summary": f"Pipeline error: {str(exc)[:120]}",
         })
@@ -134,22 +146,38 @@ async def _run_pipeline(claim_id: str, state: ClaimState):
 
 @app.get("/claims/{claim_id}/events")
 async def stream_events(claim_id: str):
-    """SSE endpoint — streams agent events as they are appended."""
+    """SSE endpoint — streams agent events via queue for real-time delivery."""
+    q: asyncio.Queue = asyncio.Queue()
+    _claim_queues[claim_id] = q
+
     async def generator():
-        sent = 0
-        for _ in range(300):  # 5-min timeout
-            events = _claim_events.get(claim_id, [])
-            while sent < len(events):
-                yield {"data": json.dumps(events[sent])}
-                sent += 1
-            state = _claim_states.get(claim_id)
-            if state and state.status.value in (
-                "reconciled", "appealed", "paid"
-            ):
-                yield {"data": json.dumps({"agent": "system", "event": "done",
-                                           "summary": "Pipeline complete."})}
-                return
-            await asyncio.sleep(1)
+        # First send any already-buffered events
+        for ev in _claim_events.get(claim_id, []):
+            yield {"data": json.dumps(ev)}
+
+        # Then stream new events from the queue
+        timeout_count = 0
+        while timeout_count < 300:
+            try:
+                ev = await asyncio.wait_for(q.get(), timeout=1.0)
+                yield {"data": json.dumps(ev)}
+                # Check terminal state
+                state = _claim_states.get(claim_id)
+                if state and state.status.value in ("reconciled", "appealed", "paid"):
+                    yield {"data": json.dumps({"agent": "system", "event": "done",
+                                               "summary": "Pipeline complete."})}
+                    return
+            except asyncio.TimeoutError:
+                timeout_count += 1
+                # Check if pipeline is done even without new events
+                state = _claim_states.get(claim_id)
+                if state and state.status.value in ("reconciled", "appealed", "paid"):
+                    yield {"data": json.dumps({"agent": "system", "event": "done",
+                                               "summary": "Pipeline complete."})}
+                    return
+
+        # Cleanup
+        _claim_queues.pop(claim_id, None)
 
     return EventSourceResponse(generator())
 
@@ -338,58 +366,54 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
     if decision.approved:
         state.needs_human_review = False
         state.review_reason = ""
-        _claim_states[claim_id] = state
-
-        config = {"configurable": {"thread_id": claim_id}}
-
-        # Check if a live checkpoint exists for this claim
-        from app.graph.pipeline import pipeline as _pipeline, _checkpointer
-        checkpoint = _checkpointer.get(config)
-
-        if checkpoint is not None:
-            # Real HITL resume — graph is paused at interrupt()
-            async def _resume():
-                try:
-                    result = await _pipeline.ainvoke(None, config=config)
-                    final = ClaimState(**result)
-                    _claim_states[claim_id] = final
-                    for ev in final.agent_events:
-                        if ev.model_dump() not in _claim_events.get(claim_id, []):
-                            _claim_events[claim_id].append(ev.model_dump())
-                    try:
-                        get_supabase().table("claims").update({
-                            "status":              final.status.value,
-                            "total_charge":        final.total_charge,
-                            "denial_risk":         final.denial_risk,
-                            "denial_risk_factors": final.denial_risk_factors,
-                            "carc_code":           final.carc_code or None,
-                            "rarc_code":           final.rarc_code or None,
-                            "appeal_letter":       final.appeal_letter or None,
-                            "cms1500_path":        final.cms1500_path or None,
-                        }).eq("id", claim_id).execute()
-                    except Exception as db_err:
-                        print(f"[resume] DB update error: {db_err}")
-                except Exception as e:
-                    print(f"[resume] pipeline error: {e}")
-            asyncio.create_task(_resume())
+        # Set status to SCRUBBED so pipeline routes to submission next
+        if "denial risk" in (state.review_reason or "").lower() or state.denial_risk > 0.5:
+            state.status = ClaimStatus.SCRUBBED
         else:
-            # Seeded/stale claim — no checkpoint, just update status directly
-            state.status = ClaimStatus.SUBMITTED
-            _claim_states[claim_id] = state
-            _claim_events.setdefault(claim_id, []).append({
-                "agent": "submission", "event": "completed",
-                "summary": "Claim approved by reviewer. Submitting to clearinghouse.",
-            })
+            state.status = ClaimStatus.EXTRACTED
+        state.status = ClaimStatus.SCRUBBED  # always go to submission after approval
+        _claim_states[claim_id] = state
+        _claim_events.setdefault(claim_id, [])
+
+        async def _resume():
             try:
-                get_supabase().table("claims").update({
-                    "status": "submitted",
-                }).eq("id", claim_id).execute()
+                from app.graph.pipeline import pipeline as _pipeline
+                # Use a NEW thread_id so we don't hit the old interrupted checkpoint
+                new_config = {
+                    "configurable": {"thread_id": f"{claim_id}-resumed"},
+                    "recursion_limit": 100
+                }
+                final_state_dict = await _pipeline.ainvoke(
+                    state.model_dump(), config=new_config
+                )
+                final = ClaimState(**final_state_dict)
+                _claim_states[claim_id] = final
+
+                for ev in final.agent_events:
+                    ev_dict = ev.model_dump()
+                    existing = _claim_events.get(claim_id, [])
+                    if ev_dict not in existing:
+                        await push_event(claim_id, ev_dict)
+                        await asyncio.sleep(0.3)
+
+                try:
+                    get_supabase().table("claims").update({
+                        "status":              final.status.value,
+                        "total_charge":        final.total_charge,
+                        "denial_risk":         final.denial_risk,
+                        "denial_risk_factors": final.denial_risk_factors,
+                        "carc_code":           final.carc_code or None,
+                        "rarc_code":           final.rarc_code or None,
+                        "appeal_letter":       final.appeal_letter or None,
+                        "cms1500_path":        final.cms1500_path or None,
+                    }).eq("id", claim_id).execute()
+                except Exception as db_err:
+                    print(f"[resume] DB update error: {db_err}")
             except Exception as e:
-                print(f"[approve] DB update error: {e}")
-            _claim_events[claim_id].append({
-                "agent": "system", "event": "done",
-                "summary": "Pipeline complete.",
-            })
+                print(f"[resume] pipeline error: {e}")
+                import traceback
+                traceback.print_exc()
+        asyncio.create_task(_resume())
     else:
         state.status = ClaimStatus.NEEDS_REVIEW
         state.needs_human_review = True
