@@ -14,7 +14,12 @@ load_dotenv()
 
 from app.schemas.claim_state import ClaimState, ClaimStatus
 from app.graph.pipeline import pipeline
-from app.services.supabase_client import get_supabase, log_agent_event
+from app.services.supabase_client import (
+    get_supabase,
+    log_agent_event,
+    load_claim_state,
+    save_claim_state,
+)
 
 UPLOAD_DIR = Path("data/synthetic/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -37,6 +42,25 @@ async def push_event(claim_id: str, event: dict) -> None:
 class ResumeDecision(BaseModel):
     approved: bool
     reviewer_notes: str = ""
+
+
+def _get_state(claim_id: str) -> ClaimState | None:
+    """In-memory state, or rehydrate the durable snapshot after a restart."""
+    state = _claim_states.get(claim_id)
+    if state is not None:
+        return state
+    snapshot = load_claim_state(claim_id)
+    if snapshot is None:
+        return None
+    try:
+        state = ClaimState(**snapshot)
+    except Exception as exc:
+        print(f"[state] rehydrate error for {claim_id}: {exc}")
+        return None
+    _claim_states[claim_id] = state
+    _claim_events.setdefault(claim_id, [])
+    _state_events_pushed.setdefault(claim_id, len(state.agent_events))
+    return state
 
 
 @asynccontextmanager
@@ -145,8 +169,11 @@ async def _stream_pipeline(claim_id: str, state: ClaimState, thread_id: str) -> 
                 await push_event(claim_id, events[pushed].model_dump())
                 pushed += 1
                 _state_events_pushed[claim_id] = pushed
+            # Snapshot after each node so a restart loses at most one step.
+            asyncio.create_task(save_claim_state(current.model_dump()))
 
         _persist_claim_row(final_state)
+        await save_claim_state(final_state.model_dump())
         # SSE generators detect paused/terminal state themselves.
 
     except Exception as exc:
@@ -190,8 +217,9 @@ async def stream_events(claim_id: str):
         else:
             for ev in _history_from_db(claim_id):
                 yield {"data": json.dumps(ev)}
-            # Claim not in memory at all -> nothing live will arrive; close out.
-            if claim_id not in _claim_states:
+            # Rehydrate from the durable snapshot (post-restart); if there is
+            # no snapshot, nothing live will arrive — close out.
+            if _get_state(claim_id) is None:
                 yield {"data": json.dumps({"agent": "system", "event": "done",
                                            "summary": "Showing recorded history."})}
                 return
@@ -256,9 +284,9 @@ async def claim_history(claim_id: str):
 
 @app.get("/claims/{claim_id}")
 async def get_claim(claim_id: str):
-    state = _claim_states.get(claim_id)
+    state = _get_state(claim_id)
     if not state:
-        # Fallback to DB
+        # Seeded claims have a flat row but no full snapshot.
         try:
             row = get_supabase().table("claims").select("*").eq("id", claim_id).single().execute()
             return row.data
@@ -279,7 +307,7 @@ async def list_claims():
 
 @app.get("/claims/{claim_id}/cms1500")
 async def download_cms1500(claim_id: str):
-    state = _claim_states.get(claim_id)
+    state = _get_state(claim_id)
     if not state or not state.cms1500_path:
         raise HTTPException(404, "CMS-1500 not generated yet")
     return FileResponse(state.cms1500_path, media_type="application/pdf",
@@ -308,7 +336,7 @@ def _in_memory_review_items() -> list[dict]:
 
 
 def _claim_fields_for_review(claim_id: str) -> dict:
-    state = _claim_states.get(claim_id)
+    state = _get_state(claim_id)
     if state:
         return {
             "claim_status": state.status.value,
@@ -385,7 +413,7 @@ async def list_review_queue():
 
 @app.post("/claims/{claim_id}/review-queue")
 async def enqueue_review(claim_id: str):
-    state = _claim_states.get(claim_id)
+    state = _get_state(claim_id)
     if not state:
         raise HTTPException(404, "Claim not found")
     try:
@@ -407,7 +435,7 @@ async def enqueue_review(claim_id: str):
 
 @app.post("/claims/{claim_id}/resume")
 async def resume_claim(claim_id: str, decision: ResumeDecision):
-    state = _claim_states.get(claim_id)
+    state = _get_state(claim_id)
     if not state:
         # Seeded claim — load from DB and construct minimal state
         try:
@@ -464,6 +492,7 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
             state.status = ClaimStatus.RECONCILED
             _claim_states[claim_id] = state
             _persist_claim_row(state)
+            await save_claim_state(state.model_dump())
             summary = (
                 f"Reviewer accepted posted payment of ${state.amount_paid:.2f} "
                 f"(variance ${state.recon_variance:.2f} written off)."
@@ -539,6 +568,7 @@ Draft a complete appeal letter arguing medical necessity."""
                     appeal_letter=appeal_text,
                 )
                 _persist_claim_row(state)
+                await save_claim_state(state.model_dump())
                 await push_event(claim_id, {
                     "agent": "system", "event": "done",
                     "summary": "Pipeline complete.",
