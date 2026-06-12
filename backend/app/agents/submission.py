@@ -127,6 +127,12 @@ async def run(state: ClaimState) -> ClaimState:
                 f"{len(denied_lines)} line-level denial(s): {line_notes}. "
                 f"Expected payment ${state.amount_expected:.2f}. Awaiting ERA."
             )
+        elif state.amount_expected == 0:
+            summary = (
+                f"Claim accepted by clearinghouse. Ref: {state.clearinghouse_ref}. "
+                f"All {len(result['line_decisions'])} line(s) payable, but the entire allowed amount "
+                f"applies to patient cost sharing (copay/deductible/coinsurance) — payer payment $0.00. Awaiting ERA."
+            )
         else:
             summary = (
                 f"Claim accepted by clearinghouse. Ref: {state.clearinghouse_ref}. "

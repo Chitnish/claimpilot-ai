@@ -11,6 +11,7 @@ import {
   Download,
   Info,
   Loader2,
+  PauseCircle,
   User,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ export default function ClaimDetailPage(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [isDone, setIsDone] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [appealOpen, setAppealOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -79,6 +81,8 @@ export default function ClaimDetailPage(): React.ReactElement {
   useEffect(() => {
     isDoneRef.current = false;
     setIsDone(false);
+    setIsPaused(false);
+    setEvents([]);
   }, [claimId]);
 
   useEffect(() => {
@@ -105,10 +109,10 @@ export default function ClaimDetailPage(): React.ReactElement {
         const parsed: unknown = JSON.parse(data);
         const event = agentEventSchema.parse(parsed);
         setEvents((prev) => [...prev, { ...event, receivedAt: new Date() }]);
-        if (
-          event.event === "done" ||
-          (event.agent === "system" && event.event === "done")
-        ) {
+        if (event.event === "done") {
+          markDone();
+        } else if (event.event === "paused") {
+          setIsPaused(true);
           markDone();
         }
       } catch {
@@ -365,7 +369,12 @@ export default function ClaimDetailPage(): React.ReactElement {
                   Real-time updates from the ClaimPilot pipeline
                 </CardDescription>
               </div>
-              {isDone ? (
+              {isPaused ? (
+                <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
+                  <PauseCircle className="size-4 shrink-0" />
+                  Paused for review
+                </div>
+              ) : isDone ? (
                 <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
                   <CheckCircle2 className="size-4 shrink-0" />
                   Pipeline complete

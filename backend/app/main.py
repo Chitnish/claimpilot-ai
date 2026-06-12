@@ -14,15 +14,16 @@ load_dotenv()
 
 from app.schemas.claim_state import ClaimState, ClaimStatus
 from app.graph.pipeline import pipeline
-from app.services.supabase_client import get_supabase
+from app.services.supabase_client import get_supabase, log_agent_event
 
 UPLOAD_DIR = Path("data/synthetic/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# In-memory store for SSE streaming (replaced by DB pub/sub in Phase 3)
+# In-memory store for SSE streaming (durable history lives in agent_runs)
 _claim_events: dict[str, list[dict]] = {}
 _claim_states: dict[str, ClaimState] = {}
 _claim_queues: dict[str, asyncio.Queue] = {}
+_state_events_pushed: dict[str, int] = {}  # count of state.agent_events already streamed
 
 
 async def push_event(claim_id: str, event: dict) -> None:
@@ -43,7 +44,7 @@ async def lifespan(app: FastAPI):
     # Verify DB connection on startup
     try:
         get_supabase().table("orgs").select("id").limit(1).execute()
-        print("[startup] Supabase connected ✓")
+        print("[startup] Supabase connected OK")
     except Exception as e:
         print(f"[startup] Supabase connection error: {e}")
     yield
@@ -108,40 +109,58 @@ async def upload_document(file: UploadFile = File(...)):
     return {"claim_id": claim_id, "status": "processing"}
 
 
-async def _run_pipeline(claim_id: str, state: ClaimState):
+def _persist_claim_row(state: ClaimState) -> None:
     try:
-        config = {"configurable": {"thread_id": claim_id}, "recursion_limit": 100}
-        final_state_dict = await pipeline.ainvoke(state.model_dump(), config=config)
-        final_state = ClaimState(**final_state_dict)
-        _claim_states[claim_id] = final_state
+        get_supabase().table("claims").update({
+            "status":               state.status.value,
+            "payer_name":           state.payer_name or None,
+            "total_charge":         state.total_charge,
+            "denial_risk":          state.denial_risk,
+            "denial_risk_factors":  state.denial_risk_factors,
+            "carc_code":            state.carc_code or None,
+            "rarc_code":            state.rarc_code or None,
+            "appeal_letter":        state.appeal_letter or None,
+            "cms1500_path":         state.cms1500_path or None,
+        }).eq("id", state.claim_id).execute()
+    except Exception as e:
+        print(f"[pipeline] claim update error: {e}")
 
-        # Push all events — but do it one by one with a small delay for streaming effect
-        for ev in final_state.agent_events:
-            ev_dict = ev.model_dump()
-            if ev_dict not in _claim_events.get(claim_id, []):
-                await push_event(claim_id, ev_dict)
-                await asyncio.sleep(0.3)  # 300ms between events for visual streaming
 
-        try:
-            get_supabase().table("claims").update({
-                "status":               final_state.status.value,
-                "total_charge":         final_state.total_charge,
-                "denial_risk":          final_state.denial_risk,
-                "denial_risk_factors":  final_state.denial_risk_factors,
-                "carc_code":            final_state.carc_code or None,
-                "rarc_code":            final_state.rarc_code or None,
-                "appeal_letter":        final_state.appeal_letter or None,
-                "cms1500_path":         final_state.cms1500_path or None,
-            }).eq("id", claim_id).execute()
-        except Exception as e:
-            print(f"[pipeline] claim update error: {e}")
+async def _stream_pipeline(claim_id: str, state: ClaimState, thread_id: str) -> None:
+    """Run the graph and push agent events to SSE the moment each node finishes."""
+    pushed = _state_events_pushed.get(claim_id, 0)
+    final_state = state
+    try:
+        config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 100}
+        async for chunk in pipeline.astream(
+            state.model_dump(), config=config, stream_mode="values"
+        ):
+            if not isinstance(chunk, dict):
+                continue
+            current = ClaimState(**chunk)
+            final_state = current
+            _claim_states[claim_id] = current
+            events = current.agent_events
+            while pushed < len(events):
+                await push_event(claim_id, events[pushed].model_dump())
+                pushed += 1
+                _state_events_pushed[claim_id] = pushed
+
+        _persist_claim_row(final_state)
+        # SSE generators detect paused/terminal state themselves.
 
     except Exception as exc:
         print(f"[pipeline] error for {claim_id}: {exc}")
+        import traceback
+        traceback.print_exc()
         await push_event(claim_id, {
             "agent": "system", "event": "error",
             "summary": f"Pipeline error: {str(exc)[:120]}",
         })
+
+
+async def _run_pipeline(claim_id: str, state: ClaimState):
+    await _stream_pipeline(claim_id, state, thread_id=claim_id)
 
 
 @app.get("/claims/{claim_id}/events")
@@ -150,36 +169,89 @@ async def stream_events(claim_id: str):
     q: asyncio.Queue = asyncio.Queue()
     _claim_queues[claim_id] = q
 
-    async def generator():
-        # First send any already-buffered events
-        for ev in _claim_events.get(claim_id, []):
-            yield {"data": json.dumps(ev)}
+    def _terminal_event(state: ClaimState | None) -> dict | None:
+        if state is None:
+            return None
+        if state.status.value in ("reconciled", "paid") or (
+            state.status.value in ("appealed", "denied") and state.anomaly_score > 0
+        ):
+            return {"agent": "system", "event": "done", "summary": "Pipeline complete."}
+        if state.needs_human_review and state.status == ClaimStatus.NEEDS_REVIEW:
+            return {"agent": "system", "event": "paused",
+                    "summary": f"Pipeline paused for human review — {state.review_reason}"}
+        return None
 
-        # Then stream new events from the queue
+    async def generator():
+        # Backfill: in-memory buffer first, else durable agent_runs history.
+        buffered = _claim_events.get(claim_id)
+        if buffered:
+            for ev in buffered:
+                yield {"data": json.dumps(ev)}
+        else:
+            for ev in _history_from_db(claim_id):
+                yield {"data": json.dumps(ev)}
+            # Claim not in memory at all -> nothing live will arrive; close out.
+            if claim_id not in _claim_states:
+                yield {"data": json.dumps({"agent": "system", "event": "done",
+                                           "summary": "Showing recorded history."})}
+                return
+
+        terminal = _terminal_event(_claim_states.get(claim_id))
+        if terminal:
+            yield {"data": json.dumps(terminal)}
+            return
+
+        # Stream new events from the queue as the pipeline produces them.
         timeout_count = 0
         while timeout_count < 300:
             try:
                 ev = await asyncio.wait_for(q.get(), timeout=1.0)
                 yield {"data": json.dumps(ev)}
-                # Check terminal state
-                state = _claim_states.get(claim_id)
-                if state and state.status.value in ("reconciled", "appealed", "paid"):
-                    yield {"data": json.dumps({"agent": "system", "event": "done",
-                                               "summary": "Pipeline complete."})}
-                    return
+                timeout_count = 0
             except asyncio.TimeoutError:
                 timeout_count += 1
-                # Check if pipeline is done even without new events
-                state = _claim_states.get(claim_id)
-                if state and state.status.value in ("reconciled", "appealed", "paid"):
-                    yield {"data": json.dumps({"agent": "system", "event": "done",
-                                               "summary": "Pipeline complete."})}
-                    return
+            terminal = _terminal_event(_claim_states.get(claim_id))
+            if terminal:
+                yield {"data": json.dumps(terminal)}
+                return
 
         # Cleanup
         _claim_queues.pop(claim_id, None)
 
     return EventSourceResponse(generator())
+
+
+def _history_from_db(claim_id: str) -> list[dict]:
+    """Durable agent activity from the agent_runs table (survives restarts)."""
+    try:
+        rows = (
+            get_supabase()
+            .table("agent_runs")
+            .select("agent, event, summary, payload, latency_ms, created_at")
+            .eq("claim_id", claim_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return [
+            {
+                "agent": r.get("agent", ""),
+                "event": r.get("event", ""),
+                "summary": r.get("summary", ""),
+                "payload": r.get("payload") or {},
+                "latency_ms": r.get("latency_ms") or 0,
+                "created_at": r.get("created_at", ""),
+            }
+            for r in (rows.data or [])
+        ]
+    except Exception as e:
+        print(f"[history] agent_runs query error: {e}")
+        return []
+
+
+@app.get("/claims/{claim_id}/history")
+async def claim_history(claim_id: str):
+    """Full durable agent activity trail for a claim."""
+    return _history_from_db(claim_id)
 
 
 @app.get("/claims/{claim_id}")
@@ -363,57 +435,56 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
         except Exception as e:
             raise HTTPException(404, f"Claim not found: {e}")
 
+    review_reason = state.review_reason or ""
+    reason_lower = review_reason.lower()
+
+    # Audit trail: every review decision is a durable agent_runs row.
+    decision_summary = (
+        f"Reviewer {'APPROVED' if decision.approved else 'REJECTED'} claim — "
+        f"reason under review: {review_reason or 'manual review'}."
+        + (f" Notes: {decision.reviewer_notes}" if decision.reviewer_notes else "")
+    )
+    await log_agent_event(
+        claim_id, state.org_id, "human_review", "decision",
+        decision_summary, {"approved": decision.approved, "reason": review_reason}, 0,
+    )
+    await push_event(claim_id, {
+        "agent": "human_review", "event": "decision", "summary": decision_summary,
+    })
+    _state_events_pushed[claim_id] = len(state.agent_events)
+
     if decision.approved:
         state.needs_human_review = False
         state.review_reason = ""
-        # Set status to SCRUBBED so pipeline routes to submission next
-        if "denial risk" in (state.review_reason or "").lower() or state.denial_risk > 0.5:
-            state.status = ClaimStatus.SCRUBBED
-        else:
-            state.status = ClaimStatus.EXTRACTED
-        state.status = ClaimStatus.SCRUBBED  # always go to submission after approval
-        _claim_states[claim_id] = state
         _claim_events.setdefault(claim_id, [])
 
-        async def _resume():
-            try:
-                from app.graph.pipeline import pipeline as _pipeline
-                # Use a NEW thread_id so we don't hit the old interrupted checkpoint
-                new_config = {
-                    "configurable": {"thread_id": f"{claim_id}-resumed"},
-                    "recursion_limit": 100
-                }
-                final_state_dict = await _pipeline.ainvoke(
-                    state.model_dump(), config=new_config
-                )
-                final = ClaimState(**final_state_dict)
-                _claim_states[claim_id] = final
-
-                for ev in final.agent_events:
-                    ev_dict = ev.model_dump()
-                    existing = _claim_events.get(claim_id, [])
-                    if ev_dict not in existing:
-                        await push_event(claim_id, ev_dict)
-                        await asyncio.sleep(0.3)
-
-                try:
-                    get_supabase().table("claims").update({
-                        "status":              final.status.value,
-                        "total_charge":        final.total_charge,
-                        "denial_risk":         final.denial_risk,
-                        "denial_risk_factors": final.denial_risk_factors,
-                        "carc_code":           final.carc_code or None,
-                        "rarc_code":           final.rarc_code or None,
-                        "appeal_letter":       final.appeal_letter or None,
-                        "cms1500_path":        final.cms1500_path or None,
-                    }).eq("id", claim_id).execute()
-                except Exception as db_err:
-                    print(f"[resume] DB update error: {db_err}")
-            except Exception as e:
-                print(f"[resume] pipeline error: {e}")
-                import traceback
-                traceback.print_exc()
-        asyncio.create_task(_resume())
+        if "variance" in reason_lower:
+            # Payment already received — approving accepts the posted payment.
+            state.recon_discrepancy = False
+            state.status = ClaimStatus.RECONCILED
+            _claim_states[claim_id] = state
+            _persist_claim_row(state)
+            summary = (
+                f"Reviewer accepted posted payment of ${state.amount_paid:.2f} "
+                f"(variance ${state.recon_variance:.2f} written off)."
+            )
+            await log_agent_event(claim_id, state.org_id, "reconciliation", "completed",
+                                  summary, {"paid": state.amount_paid}, 0)
+            await push_event(claim_id, {
+                "agent": "reconciliation", "event": "completed", "summary": summary,
+            })
+        else:
+            # Resume the pipeline. Extraction/eligibility holds restart from
+            # coding; scrub blocks and denial-risk holds go straight to submission.
+            if "low confidence" in reason_lower or "coverage terminated" in reason_lower:
+                state.status = ClaimStatus.EXTRACTED
+            else:
+                state.status = ClaimStatus.SCRUBBED
+            _claim_states[claim_id] = state
+            # Fresh thread id so we don't collide with the interrupted checkpoint.
+            asyncio.create_task(
+                _stream_pipeline(claim_id, state, thread_id=f"{claim_id}-resumed-{uuid.uuid4().hex[:6]}")
+            )
     else:
         state.status = ClaimStatus.NEEDS_REVIEW
         state.needs_human_review = True
@@ -451,10 +522,14 @@ Draft a complete appeal letter arguing medical necessity."""
                 state.carc_code = "50"
                 state.status = ClaimStatus.APPEALED
                 _claim_states[claim_id] = state
-                # Update SSE buffer
-                _claim_events[claim_id].append({
-                    "agent": "submission", "event": "completed",
-                    "summary": f"Claim rejected by reviewer. Appeal letter drafted ({len(appeal_text.split())} words) citing medical necessity. Sending appeal email.",
+                summary = (
+                    f"Claim rejected by reviewer. Appeal letter drafted "
+                    f"({len(appeal_text.split())} words) citing medical necessity. Sending appeal email."
+                )
+                await log_agent_event(claim_id, state.org_id, "submission", "completed",
+                                      summary, {"carc": "50"}, 0)
+                await push_event(claim_id, {
+                    "agent": "submission", "event": "completed", "summary": summary,
                 })
                 await send_appeal_email(
                     claim_id=state.claim_id,
@@ -463,16 +538,8 @@ Draft a complete appeal letter arguing medical necessity."""
                     carc_code="50",
                     appeal_letter=appeal_text,
                 )
-                # Update DB
-                try:
-                    get_supabase().table("claims").update({
-                        "status": "appealed",
-                        "appeal_letter": appeal_text,
-                        "carc_code": "50",
-                    }).eq("id", claim_id).execute()
-                except Exception as db_err:
-                    print(f"[reject] DB update error: {db_err}")
-                _claim_events[claim_id].append({
+                _persist_claim_row(state)
+                await push_event(claim_id, {
                     "agent": "system", "event": "done",
                     "summary": "Pipeline complete.",
                 })

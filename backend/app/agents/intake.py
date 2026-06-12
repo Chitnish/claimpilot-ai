@@ -29,7 +29,15 @@ def _to_base64_image(doc_path: str) -> tuple[str, str]:
 
     if suffix == ".pdf":
         from pdf2image import convert_from_path
-        pages = convert_from_path(doc_path, first_page=1, last_page=1, dpi=200)
+        kwargs = {}
+        poppler_path = os.getenv("POPPLER_PATH", "")
+        if not poppler_path:
+            default = Path(r"C:\poppler\poppler-24.08.0\Library\bin")
+            if default.exists():
+                poppler_path = str(default)
+        if poppler_path:
+            kwargs["poppler_path"] = poppler_path
+        pages = convert_from_path(doc_path, first_page=1, last_page=1, dpi=200, **kwargs)
         if not pages:
             raise ValueError("pdf2image returned no pages")
         import io

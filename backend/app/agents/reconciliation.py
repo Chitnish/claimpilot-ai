@@ -92,11 +92,17 @@ async def run(state: ClaimState) -> ClaimState:
             f"(copay/deductible/coinsurance) posted to patient ledger."
             if state.patient_responsibility > 0 else ""
         )
-        summary = (
-            f"Reconciliation complete. ${state.amount_paid:.2f} posted from check "
-            f"{era['check_number']} — matches contracted rate "
-            f"(${era['total_billed']:.2f} billed, CO-45 contractual adjustment applied).{pr_note}"
-        )
+        if state.amount_paid == 0 and state.patient_responsibility > 0:
+            summary = (
+                f"Reconciliation complete. Payer paid $0.00 (check {era['check_number']}) — "
+                f"full allowed amount applied to patient cost sharing.{pr_note}"
+            )
+        else:
+            summary = (
+                f"Reconciliation complete. ${state.amount_paid:.2f} posted from check "
+                f"{era['check_number']} — matches contracted rate "
+                f"(${era['total_billed']:.2f} billed, CO-45 contractual adjustment applied).{pr_note}"
+            )
 
     payload = {
         "paid": state.amount_paid,
