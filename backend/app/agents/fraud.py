@@ -19,7 +19,8 @@ async def run(state: ClaimState) -> ClaimState:
     ))
 
     anomaly_score = score_anomaly(state.model_dump())
-    state.anomaly_score = anomaly_score
+    # Floor at 0.01: a zero score is the router's "not yet scored" sentinel.
+    state.anomaly_score = max(anomaly_score, 0.01)
 
     latency_ms = int((time.monotonic() - t0) * 1000)
 

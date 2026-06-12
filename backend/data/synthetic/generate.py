@@ -37,7 +37,7 @@ def make_superbill(out_dir: str = "data/synthetic") -> str:
     c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(W/2, H - 0.45*inch, "AMPCUS FAMILY MEDICINE")
     c.setFont("Helvetica", 9)
-    c.drawCentredString(W/2, H - 0.65*inch, "123 Clinic Drive, Chantilly VA 20151  |  NPI: 1234567890")
+    c.drawCentredString(W/2, H - 0.65*inch, "123 Clinic Drive, Chantilly VA 20151  |  NPI: 1234567893")
 
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 11)
@@ -50,7 +50,7 @@ def make_superbill(out_dir: str = "data/synthetic") -> str:
     mid   = f"{random.choice(PAYERS[:3]).replace(' ','')[:4].upper()}{random.randint(100000,999999)}"
     payer = random.choice(PAYERS)
     dos   = "2026-06-10"
-    npi   = "1234567890"
+    npi   = "1234567893"  # checksum-valid synthetic NPI (passes Luhn w/ 80840 prefix)
     provider = "Dr. Emily Carter MD"
 
     fields = [

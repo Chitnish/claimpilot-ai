@@ -115,7 +115,7 @@ def seed_claims() -> int:
             "org_id": org_id,
             "patient_id": patient_id,
             "provider_name": PROVIDER_NAME,
-            "provider_npi": "1234567890",
+            "provider_npi": "1234567893",
             "date_of_service": dos,
         }).execute()
         encounter_id = encounter_row.data[0]["id"]

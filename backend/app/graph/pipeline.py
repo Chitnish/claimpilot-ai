@@ -37,20 +37,20 @@ def route(state: ClaimState) -> str:
     # Then eligibility
     if state.status == ClaimStatus.DRAFT:
         return "eligibility"
-    if state.status == ClaimStatus.EXTRACTED and not state.eligibility_active:
+    if state.status == ClaimStatus.EXTRACTED and not state.eligibility_checked:
         return "eligibility"
-    if state.status == ClaimStatus.EXTRACTED and state.eligibility_active:
+    if state.status == ClaimStatus.EXTRACTED and state.eligibility_checked:
         return "coding"
     if state.status == ClaimStatus.CODED:
         return "scrub"
     if state.status == ClaimStatus.SCRUBBED:
         return "submission"
-    if state.status in (ClaimStatus.SUBMITTED, ClaimStatus.DENIED, ClaimStatus.APPEALED):
+    # Reconcile once — state.era is the sentinel that the 835 has been posted.
+    if state.status in (ClaimStatus.SUBMITTED, ClaimStatus.DENIED, ClaimStatus.APPEALED) and not state.era:
         return "reconciliation"
-    if state.status in (ClaimStatus.RECONCILED, ClaimStatus.PAID) and state.anomaly_score == 0.0:
+    terminal = (ClaimStatus.RECONCILED, ClaimStatus.PAID, ClaimStatus.DENIED, ClaimStatus.APPEALED)
+    if state.status in terminal and state.anomaly_score == 0.0:
         return "fraud"
-    if state.status in (ClaimStatus.RECONCILED, ClaimStatus.PAID) and state.anomaly_score > 0.0:
-        return "end"
     return "end"
 
 

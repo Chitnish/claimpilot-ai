@@ -53,10 +53,16 @@ class ClaimState(BaseModel):
     extraction_confidence: dict[str, float] = Field(default_factory=dict)
     low_confidence_fields: list[str] = Field(default_factory=list)
 
-    # Eligibility
+    # Eligibility (271 response)
+    eligibility_checked: bool = False
     eligibility_active: bool = False
+    plan_name: str = ""
     copay: float = 0.0
+    coinsurance: float = 0.0          # plan coinsurance rate, e.g. 0.20
+    deductible_total: float = 0.0
     deductible_remaining: float = 0.0
+    prior_auth_cpts: list[str] = Field(default_factory=list)   # CPTs payer requires auth for
+    prior_auth_on_file: bool = False
 
     # Coding
     coding_issues: list[str] = Field(default_factory=list)
@@ -75,17 +81,21 @@ class ClaimState(BaseModel):
     # Fraud / anomaly
     anomaly_score: float = 0.0
 
-    # Submission
+    # Submission / adjudication
     clearinghouse_ref: str = ""
     submission_status: str = ""
     carc_code: str = ""
     rarc_code: str = ""
     denial_reason: str = ""
+    rarc_reason: str = ""
     appeal_letter: str = ""
+    adjudication: dict[str, Any] = Field(default_factory=dict)  # line-level payer decisions
 
-    # Reconciliation
+    # Reconciliation (835/ERA)
+    era: dict[str, Any] = Field(default_factory=dict)
     amount_paid: float = 0.0
     amount_expected: float = 0.0
+    patient_responsibility: float = 0.0
     recon_variance: float = 0.0
     recon_discrepancy: bool = False
     recon_notes: str = ""
