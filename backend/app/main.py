@@ -44,6 +44,15 @@ class ResumeDecision(BaseModel):
     reviewer_notes: str = ""
 
 
+class CopilotChatMessage(BaseModel):
+    role: str = "user"
+    content: str
+
+
+class CopilotChatRequest(BaseModel):
+    messages: list[CopilotChatMessage]
+
+
 def _get_state(claim_id: str) -> ClaimState | None:
     """In-memory state, or rehydrate the durable snapshot after a restart."""
     state = _claim_states.get(claim_id)
@@ -731,3 +740,55 @@ Draft a complete appeal letter arguing medical necessity."""
         print(f"[resume] review_queue update error: {e}")
 
     return {"resumed": True, "approved": decision.approved}
+
+
+@app.post("/claims/{claim_id}/chat")
+async def claim_chat(claim_id: str, request: CopilotChatRequest):
+    """Grounded review-copilot Q&A for a single claim's detail page."""
+    from app.services.review_copilot import CopilotMessage, answer
+
+    state = _get_state(claim_id)
+    if not state:
+        # Seeded claims have a flat row but no full snapshot — rehydrate minimally.
+        try:
+            row = get_supabase().table("claims").select("*").eq("id", claim_id).single().execute()
+            if not row.data:
+                raise HTTPException(404, "Claim not found")
+            d = row.data
+            state = ClaimState(
+                claim_id=claim_id,
+                org_id=d.get("org_id") or "",
+                status=ClaimStatus(d.get("status", "draft")),
+                payer_name=d.get("payer_name") or "",
+                total_charge=d.get("total_charge") or 0.0,
+                denial_risk=d.get("denial_risk") or 0.0,
+                denial_risk_factors=d.get("denial_risk_factors") or [],
+                carc_code=d.get("carc_code") or "",
+                rarc_code=d.get("rarc_code") or "",
+                appeal_letter=d.get("appeal_letter") or "",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(404, f"Claim not found: {e}")
+
+    messages = [
+        CopilotMessage(role=m.role, content=m.content)
+        for m in request.messages
+        if m.content.strip()
+    ]
+    if not messages:
+        raise HTTPException(400, "No message content provided")
+
+    try:
+        response, latency_ms = await answer(state, messages)
+    except Exception as e:
+        print(f"[chat] copilot error for {claim_id}: {type(e).__name__}")
+        raise HTTPException(502, "Copilot is unavailable right now. Please try again.")
+
+    return {
+        "reply": response.reply,
+        "citations": response.citations,
+        "suggested_actions": response.suggested_actions,
+        "latency_ms": latency_ms,
+    }

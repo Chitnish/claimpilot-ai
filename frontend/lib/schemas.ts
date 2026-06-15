@@ -284,6 +284,27 @@ export const resumeResponseSchema = z.object({
 
 export type ResumeResponse = z.infer<typeof resumeResponseSchema>;
 
+export const copilotResponseSchema = z
+  .object({
+    reply: z.string().default(""),
+    citations: z.array(z.string()).default([]),
+    suggested_actions: z.array(z.string()).default([]),
+    latency_ms: z.number().optional(),
+  })
+  .transform((data) => ({
+    reply: data.reply,
+    citations: data.citations,
+    suggestedActions: data.suggested_actions,
+    latencyMs: data.latency_ms ?? 0,
+  }));
+
+export type CopilotResponse = z.infer<typeof copilotResponseSchema>;
+
+export interface CopilotChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export const claimSearchResponseSchema = z
   .object({
     items: z.array(claimSchema),

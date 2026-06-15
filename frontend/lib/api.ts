@@ -4,6 +4,7 @@ import {
   claimSchema,
   claimSearchResponseSchema,
   claimsListSchema,
+  copilotResponseSchema,
   resumeResponseSchema,
   reviewQueueSchema,
   uploadResponseSchema,
@@ -11,6 +12,8 @@ import {
   type Analytics,
   type Claim,
   type ClaimSearchResponse,
+  type CopilotChatMessage,
+  type CopilotResponse,
   type ResumeResponse,
   type ReviewItem,
   type UploadResponse,
@@ -132,6 +135,23 @@ export async function resumeClaim(
   }
 
   return parseJson(response, resumeResponseSchema);
+}
+
+export async function chatWithClaim(
+  claimId: string,
+  messages: CopilotChatMessage[],
+): Promise<CopilotResponse> {
+  const response = await fetch(`${API_BASE}/claims/${claimId}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Copilot request failed (${response.status})`);
+  }
+
+  return parseJson(response, copilotResponseSchema);
 }
 
 export function subscribeToClaimEvents(

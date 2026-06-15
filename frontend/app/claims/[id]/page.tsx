@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PipelineDiagram } from "@/components/pipeline-diagram";
+import { ReviewCopilot } from "@/components/review-copilot";
 
 export default function ClaimDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
@@ -506,6 +507,11 @@ export default function ClaimDetailPage(): React.ReactElement {
               )}
             </Card>
           )}
+
+          <ReviewCopilot
+            claimId={claim.claimId}
+            needsHumanReview={claim.needsHumanReview}
+          />
         </div>
 
         <Card className="lg:col-span-2">
