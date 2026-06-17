@@ -114,6 +114,8 @@ class ClaimState(BaseModel):
     review_reason: str = ""
     reviewer_comment: str = ""
     reviewer_decision: str = ""  # "approved" or "rejected"
+    reviewer_name: str = ""      # attributable identity of the deciding reviewer
+    reviewer_role: str = ""      # biller | supervisor | manager
 
     # Trace log (drives live feed)
     agent_events: list[AgentEvent] = Field(default_factory=list)

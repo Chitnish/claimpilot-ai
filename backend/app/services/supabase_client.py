@@ -48,6 +48,42 @@ async def log_agent_event(
         print(f"[agent_runs log error] {exc}")
 
 
+async def log_audit_event(
+    claim_id: str,
+    org_id: str,
+    actor_id: str,
+    actor_name: str,
+    actor_role: str,
+    action: str,
+    detail: str,
+    metadata: dict | None = None,
+) -> None:
+    """Append an attributable, immutable audit row (who did what, to which claim).
+
+    Best-effort and non-blocking: writes to the dedicated `audit_log` table if
+    it exists (see migrations/0002_audit_log.sql) and no-ops otherwise, so the
+    app works before the migration is applied. Never raises.
+    """
+    row = {
+        "claim_id": claim_id or None,
+        "org_id": org_id or None,
+        "actor_id": actor_id or "anonymous",
+        "actor_name": actor_name or "Unknown User",
+        "actor_role": actor_role or "unknown",
+        "action": action,
+        "detail": detail,
+        "metadata": metadata or {},
+    }
+
+    def _insert() -> None:
+        try:
+            get_supabase().table("audit_log").insert(row).execute()
+        except Exception as exc:  # table may not exist yet — that's fine
+            print(f"[audit_log] {action} skipped: {type(exc).__name__}")
+
+    await asyncio.to_thread(_insert)
+
+
 def _state_path(claim_id: str) -> str:
     return f"{_STATE_PREFIX}/{claim_id}.json"
 

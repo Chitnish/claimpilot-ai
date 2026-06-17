@@ -21,6 +21,8 @@ import {
   type UploadResponse,
 } from "@/lib/schemas";
 
+import { actorHeaders, getActor } from "@/lib/actor";
+
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -30,6 +32,27 @@ async function parseJson<T>(
 ): Promise<T> {
   const data: unknown = await response.json();
   return schema.parse(data);
+}
+
+/** Best-effort extraction of a FastAPI `{ detail }` error message. */
+async function errorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    if (
+      body &&
+      typeof body === "object" &&
+      "detail" in body &&
+      typeof (body as { detail: unknown }).detail === "string"
+    ) {
+      return (body as { detail: string }).detail;
+    }
+  } catch {
+    // fall through to fallback
+  }
+  return fallback;
 }
 
 export async function uploadClaim(file: File): Promise<UploadResponse> {
@@ -126,7 +149,13 @@ export async function getAnalytics(): Promise<Analytics> {
 }
 
 export function cms1500Url(claimId: string): string {
-  return `${API_BASE}/claims/${claimId}/cms1500`;
+  const actor = getActor();
+  const query = new URLSearchParams({
+    actor_id: actor.id,
+    actor_name: actor.name,
+    actor_role: actor.role,
+  });
+  return `${API_BASE}/claims/${claimId}/cms1500?${query.toString()}`;
 }
 
 export async function getReviewQueue(): Promise<ReviewItem[]> {
@@ -146,12 +175,14 @@ export async function resumeClaim(
 ): Promise<ResumeResponse> {
   const response = await fetch(`${API_BASE}/claims/${claimId}/resume`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
     body: JSON.stringify({ approved, reviewer_comment: reviewerNotes }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to resume claim (${response.status})`);
+    throw new Error(
+      await errorMessage(response, `Failed to resume claim (${response.status})`),
+    );
   }
 
   return parseJson(response, resumeResponseSchema);
@@ -163,12 +194,14 @@ export async function chatWithClaim(
 ): Promise<CopilotResponse> {
   const response = await fetch(`${API_BASE}/claims/${claimId}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
     body: JSON.stringify({ messages }),
   });
 
   if (!response.ok) {
-    throw new Error(`Copilot request failed (${response.status})`);
+    throw new Error(
+      await errorMessage(response, `Copilot request failed (${response.status})`),
+    );
   }
 
   return parseJson(response, copilotResponseSchema);

@@ -9,9 +9,11 @@ import {
   FileText,
   LayoutDashboard,
   Upload,
+  UserCircle2,
 } from "lucide-react";
 
 import { getReviewQueue } from "@/lib/api";
+import { DEMO_USERS, getActor, setActor, type DemoUser } from "@/lib/actor";
 import { cn } from "@/lib/utils";
 
 const REVIEW_POLL_INTERVAL_MS = 30_000;
@@ -27,6 +29,19 @@ const NAV_ITEMS = [
 export function AppSidebar(): React.ReactElement {
   const pathname = usePathname();
   const [reviewCount, setReviewCount] = useState(0);
+  const [actor, setActorState] = useState<DemoUser>(DEMO_USERS[2]!);
+
+  useEffect(() => {
+    setActorState(getActor());
+  }, []);
+
+  const handleActorChange = (id: string): void => {
+    const next = DEMO_USERS.find((user) => user.id === id);
+    if (next) {
+      setActor(next);
+      setActorState(next);
+    }
+  };
 
   const loadReviewCount = useCallback(async (): Promise<void> => {
     try {
@@ -82,6 +97,31 @@ export function AppSidebar(): React.ReactElement {
           );
         })}
       </nav>
+
+      <div className="mt-auto border-t border-white/10 p-3">
+        <label
+          htmlFor="actor-switcher"
+          className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-white/60"
+        >
+          <UserCircle2 className="size-3.5" />
+          Signed in as
+        </label>
+        <select
+          id="actor-switcher"
+          value={actor.id}
+          onChange={(event) => handleActorChange(event.target.value)}
+          className="w-full rounded-md border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/40"
+        >
+          {DEMO_USERS.map((user) => (
+            <option key={user.id} value={user.id} className="text-[#1e3a5f]">
+              {user.name} — {user.role}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1.5 text-[11px] leading-snug text-white/40">
+          Role controls approval authority (demo identity).
+        </p>
+      </div>
     </aside>
   );
 }

@@ -211,6 +211,8 @@ export const claimSchema = z
     review_reason: z.string().nullable().optional(),
     reviewer_comment: z.string().nullable().optional(),
     reviewer_decision: z.string().nullable().optional(),
+    reviewer_name: z.string().nullable().optional(),
+    reviewer_role: z.string().nullable().optional(),
   })
   .transform((data) => ({
     claimId: data.claim_id ?? data.id ?? "",
@@ -258,6 +260,8 @@ export const claimSchema = z
     reviewReason: data.review_reason ?? "",
     reviewerComment: data.reviewer_comment ?? "",
     reviewerDecision: data.reviewer_decision ?? "",
+    reviewerName: data.reviewer_name ?? "",
+    reviewerRole: data.reviewer_role ?? "",
   }));
 
 export type Claim = z.infer<typeof claimSchema>;

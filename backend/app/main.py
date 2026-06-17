@@ -3,7 +3,7 @@ import asyncio, json, os, shutil, uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -14,9 +14,11 @@ load_dotenv()
 
 from app.schemas.claim_state import ClaimState, ClaimStatus
 from app.graph.pipeline import pipeline
+from app.services.security import Actor, get_actor, can_approve, DEMO_USERS
 from app.services.supabase_client import (
     get_supabase,
     log_agent_event,
+    log_audit_event,
     load_claim_state,
     save_claim_state,
 )
@@ -97,6 +99,12 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "0.2.0"}
+
+
+@app.get("/auth/users")
+async def list_demo_users():
+    """Demo identity roster for the UI user switcher (Tier-1 demo, not auth)."""
+    return {"users": DEMO_USERS}
 
 
 @app.post("/claims/upload")
@@ -512,10 +520,21 @@ async def list_claims():
 
 
 @app.get("/claims/{claim_id}/cms1500")
-async def download_cms1500(claim_id: str):
+async def download_cms1500(
+    claim_id: str,
+    actor_id: str = "",
+    actor_name: str = "",
+    actor_role: str = "",
+):
     state = _get_state(claim_id)
     if not state or not state.cms1500_path:
         raise HTTPException(404, "CMS-1500 not generated yet")
+    # PHI-access audit: file downloads arrive as plain browser navigations, so
+    # the acting user travels as query params rather than headers.
+    await log_audit_event(
+        claim_id, state.org_id, actor_id, actor_name, actor_role,
+        "download_cms1500", f"Downloaded CMS-1500 PDF for claim {claim_id[:8]}",
+    )
     return FileResponse(state.cms1500_path, media_type="application/pdf",
                         filename=f"cms1500_{claim_id[:8]}.pdf")
 
@@ -640,7 +659,11 @@ async def enqueue_review(claim_id: str):
 
 
 @app.post("/claims/{claim_id}/resume")
-async def resume_claim(claim_id: str, decision: ResumeDecision):
+async def resume_claim(
+    claim_id: str,
+    decision: ResumeDecision,
+    actor: Actor = Depends(get_actor),
+):
     state = _get_state(claim_id)
     if not state:
         # Seeded claim — load from DB and construct minimal state
@@ -671,19 +694,47 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
 
     review_reason = state.review_reason or ""
     reason_lower = review_reason.lower()
+
+    # Role-based access control: rejection is open to any role, but approving a
+    # claim out of review (resuming the pipeline / accepting a payment) is gated
+    # by approval authority so a junior biller cannot clear high-dollar,
+    # high-risk, or financial-write-off work.
+    if decision.approved:
+        allowed, block_reason = can_approve(actor, state)
+        if not allowed:
+            await log_audit_event(
+                claim_id, state.org_id, actor.id, actor.name, actor.role,
+                "approve_denied", f"Approval blocked: {block_reason}",
+                {"review_reason": review_reason, "total_charge": state.total_charge,
+                 "denial_risk": state.denial_risk},
+            )
+            raise HTTPException(403, block_reason)
+
     state.reviewer_comment = decision.reviewer_comment
     state.reviewer_decision = "approved" if decision.approved else "rejected"
+    state.reviewer_name = actor.name
+    state.reviewer_role = actor.role
     _claim_states[claim_id] = state
 
-    # Audit trail: every review decision is a durable agent_runs row.
+    # Audit trail: every review decision is a durable agent_runs row AND an
+    # attributable audit_log entry (who decided, with what authority).
     decision_summary = (
-        f"Reviewer {'APPROVED' if decision.approved else 'REJECTED'} claim — "
+        f"{actor.label} {'APPROVED' if decision.approved else 'REJECTED'} claim — "
         f"reason under review: {review_reason or 'manual review'}."
         + (f" Notes: {decision.reviewer_comment}" if decision.reviewer_comment else "")
     )
     await log_agent_event(
         claim_id, state.org_id, "human_review", "decision",
-        decision_summary, {"approved": decision.approved, "reason": review_reason}, 0,
+        decision_summary,
+        {"approved": decision.approved, "reason": review_reason,
+         "actor_id": actor.id, "actor_name": actor.name, "actor_role": actor.role}, 0,
+    )
+    await log_audit_event(
+        claim_id, state.org_id, actor.id, actor.name, actor.role,
+        "approve_claim" if decision.approved else "reject_claim",
+        decision_summary,
+        {"review_reason": review_reason, "total_charge": state.total_charge,
+         "denial_risk": state.denial_risk},
     )
     await push_event(claim_id, {
         "agent": "human_review", "event": "decision", "summary": decision_summary,
@@ -817,7 +868,11 @@ only — no Markdown, no asterisks, no headers, no bullet points."""
 
 
 @app.post("/claims/{claim_id}/chat")
-async def claim_chat(claim_id: str, request: CopilotChatRequest):
+async def claim_chat(
+    claim_id: str,
+    request: CopilotChatRequest,
+    actor: Actor = Depends(get_actor),
+):
     """Grounded review-copilot Q&A for a single claim's detail page."""
     from app.services.review_copilot import CopilotMessage, answer
 
@@ -853,6 +908,13 @@ async def claim_chat(claim_id: str, request: CopilotChatRequest):
     ]
     if not messages:
         raise HTTPException(400, "No message content provided")
+
+    # PHI-access audit: the copilot exposes claim/patient data to the reviewer.
+    await log_audit_event(
+        claim_id, state.org_id, actor.id, actor.name, actor.role,
+        "view_copilot", f"Opened Review Copilot Q&A on claim {claim_id[:8]}",
+        {"question": messages[-1].content[:200]},
+    )
 
     try:
         response, latency_ms = await answer(state, messages)

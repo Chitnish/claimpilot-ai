@@ -484,6 +484,12 @@ export default function ClaimDetailPage(): React.ReactElement {
                     ? "Approved"
                     : "Rejected"}
                 </Badge>
+                {claim.reviewerName && (
+                  <p className="text-xs text-muted-foreground">
+                    by {claim.reviewerName}
+                    {claim.reviewerRole ? ` · ${claim.reviewerRole}` : ""}
+                  </p>
+                )}
                 {claim.reviewerComment && (
                   <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-sm italic text-muted-foreground">
                     {claim.reviewerComment}
