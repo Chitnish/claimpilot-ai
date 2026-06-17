@@ -497,11 +497,30 @@ export default function ClaimDetailPage(): React.ReactElement {
                   </div>
                 )}
                 {claim.anomalyScore > 0 && (
-                  <div className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Info className="size-3.5 shrink-0" />
-                    <span>
-                      Anomaly score: {Math.round(claim.anomalyScore * 100)}%
-                    </span>
+                  <div className="mt-2">
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      {claim.anomalyReasons.length > 0 ? (
+                        <ShieldAlert className="size-3.5 shrink-0 text-red-600" />
+                      ) : (
+                        <Info className="size-3.5 shrink-0" />
+                      )}
+                      <span>
+                        Fraud/anomaly score: {Math.round(claim.anomalyScore * 100)}%
+                      </span>
+                    </div>
+                    {claim.anomalyReasons.length > 0 && (
+                      <ul className="mt-2 space-y-1.5">
+                        {claim.anomalyReasons.map((reason, i) => (
+                          <li
+                            key={i}
+                            className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50/60 p-2 text-xs text-red-800"
+                          >
+                            <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
               </div>

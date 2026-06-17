@@ -88,6 +88,7 @@ class ClaimState(BaseModel):
 
     # Fraud / anomaly
     anomaly_score: float = 0.0
+    anomaly_reasons: list[str] = Field(default_factory=list)  # explainable cross-claim signals
 
     # Corrected-claim resubmission (837P CLM05-3 frequency / CMS-1500 box 22)
     frequency_code: str = "1"                  # 1=original, 7=replacement, 8=void
