@@ -34,11 +34,12 @@ VALID_NPI = "1234567893"
 INVALID_NPI = "1234567890"
 
 E_AND_M = ["99213", "99214", "99215"]
-ANCILLARY = ["93000", "85025", "80053", "99000"]
+ANCILLARY = ["93000", "85025", "80053", "99000", "90471"]
+ANCILLARY_WEIGHTS = [0.30, 0.26, 0.26, 0.06, 0.12]
 
 CHARGES = {
     "99213": 185.0, "99214": 250.0, "99215": 320.0,
-    "93000": 89.0, "85025": 45.0, "80053": 52.0, "99000": 15.0,
+    "93000": 89.0, "85025": 45.0, "80053": 52.0, "99000": 15.0, "90471": 35.0,
 }
 
 DX_SUPPORTED = {
@@ -49,6 +50,7 @@ DX_SUPPORTED = {
     "85025": ["D64.9", "R50.9", "J06.9", "E11.9"],
     "80053": ["E11.9", "E78.5", "I10"],
     "99000": ["E11.9", "I10", "E78.5"],
+    "90471": ["Z23"],
 }
 DX_UNSUPPORTED = {
     "93000": ["M54.5", "Z00.00", "F41.1"],
@@ -61,18 +63,23 @@ def _sample_claim(i: int, rng: random.Random) -> ClaimState:
     payer = rng.choice(PAYERS)
     member_id = f"{payer.replace(' ', '')[:4].upper()}{rng.randint(100000, 999999)}"
 
-    # One E/M + 1-2 ancillaries. 99000 is rare (practices seldom bill it) —
-    # weights keep the overall denial rate industry-plausible (~15-25%).
+    # One E/M + 1-2 ancillaries. 99000 is rare (practices seldom bill it). With
+    # the error-seeded mix below and the authentic edit set (status-B bundling,
+    # NCCI panel unbundling, MUE, LCD necessity, auth, timely filing) the
+    # observed claim-or-line denial rate lands ~35-40% — higher than a clean
+    # production book (~15-25%) by design, so the model has ample signal to learn.
     n_anc = rng.randint(1, 2)
     anc = []
     while len(anc) < n_anc:
-        pick = rng.choices(ANCILLARY, weights=[0.34, 0.30, 0.30, 0.06])[0]
+        pick = rng.choices(ANCILLARY, weights=ANCILLARY_WEIGHTS)[0]
         if pick not in anc:
             anc.append(pick)
     cpts = [rng.choice(E_AND_M)] + anc
 
-    has_ecg = "93000" in cpts
-    em_mods = ["25"] if has_ecg and rng.random() < 0.85 else []
+    # Modifier 25 belongs on the E/M when billed same-day as a procedure with a
+    # global period (immunization admin 90471); ~85% carry it correctly.
+    needs_mod25 = "90471" in cpts
+    em_mods = ["25"] if needs_mod25 and rng.random() < 0.85 else []
     bypass_99000 = ["59"] if "99000" in cpts and rng.random() < 0.60 else []
 
     lines: list[ClaimLine] = []

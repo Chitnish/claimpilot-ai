@@ -18,11 +18,13 @@ CPT_MAP = {
     "93000": ("Electrocardiogram, routine",                       89.00),
     "85025": ("Complete CBC with differential",                   45.00),
     "80053": ("Comprehensive metabolic panel",                    52.00),
+    "90471": ("Immunization administration, one vaccine",         35.00),
     "99000": ("Specimen handling fee",                            15.00),
 }
 
 E_AND_M = ["99213", "99214"]
-ANCILLARY = ["93000", "85025", "80053", "99000"]
+ANCILLARY = ["93000", "85025", "80053", "99000", "90471"]
+ANCILLARY_WEIGHTS = [0.30, 0.26, 0.26, 0.06, 0.12]
 
 # Clinically plausible diagnoses per CPT (matches payer coverage policy) and
 # implausible ones (will trip LCD edits) — mixed deliberately so generated
@@ -34,6 +36,7 @@ DX_SUPPORTED = {
     "85025": ["D64.9", "R50.9", "J06.9", "E11.9"],
     "80053": ["E11.9", "E78.5", "I10"],
     "99000": ["E11.9", "I10", "E78.5"],
+    "90471": ["Z23"],
 }
 DX_UNSUPPORTED = {
     "93000": ["M54.5", "Z00.00", "F41.1"],
@@ -105,14 +108,15 @@ def make_superbill(out_dir: str = "data/synthetic") -> str:
     n_anc = random.randint(1, 2)
     anc: list[str] = []
     while len(anc) < n_anc:
-        pick = random.choices(ANCILLARY, weights=[0.34, 0.30, 0.30, 0.06])[0]
+        pick = random.choices(ANCILLARY, weights=ANCILLARY_WEIGHTS)[0]
         if pick not in anc:
             anc.append(pick)
     cpts = [random.choice(E_AND_M)] + anc
-    has_ecg = "93000" in cpts
-    # Most E/M lines billed with an ECG carry the required modifier 25 —
-    # the rest will (correctly) trip the scrubber/payer bundling edit.
-    em_mods = ["25"] if has_ecg and random.random() < 0.75 else []
+    # Modifier 25 belongs on the E/M when billed same-day as a procedure with a
+    # global period (immunization admin 90471). Most carry it; the rest will
+    # (correctly) trip the scrubber/payer bundling edit.
+    needs_mod25 = "90471" in cpts
+    em_mods = ["25"] if needs_mod25 and random.random() < 0.75 else []
 
     total = 0.0
     c.setFillColor(colors.black)

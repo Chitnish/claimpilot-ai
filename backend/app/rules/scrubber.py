@@ -198,13 +198,25 @@ def _check_ncci_and_modifiers(state: ClaimState) -> list[ScrubFinding]:
     for ln in state.claim_lines:
         for pair in NCCI_PAIRS:
             if ln.cpt_code == pair["column2"] and claim_cpts & set(pair["column1"]):
-                if pair["bypass"] not in ln.modifiers:
+                bypass = pair.get("bypass")
+                if bypass is None or bypass not in ln.modifiers:
                     col1 = next(iter(claim_cpts & set(pair["column1"])))
+                    if bypass is None:
+                        # "0"-indicator edit (e.g. status-B bundled code): no
+                        # modifier can make it separately payable.
+                        fix = (
+                            f"Remove the line — {pair.get('rationale', 'not separately payable')} "
+                            f"No modifier overrides this edit."
+                        )
+                    else:
+                        fix = (
+                            f"Remove the line, or append modifier {bypass} only if it was a truly "
+                            f"distinct service ({pair.get('rationale', 'bundled')})."
+                        )
                     out.append(_finding(
                         "error", "NCCI-01",
-                        f"NCCI edit: CPT {ln.cpt_code} is incidental to CPT {col1} — will deny "
-                        f"CO-97 (bundled). Remove the line or append modifier {pair['bypass']} "
-                        f"if it was a distinct service.",
+                        f"NCCI edit: CPT {ln.cpt_code} is not separately payable when billed with "
+                        f"CPT {col1} — will deny CO-{pair.get('carc', '97')}. {fix}",
                         ln.line_no,
                     ))
 
@@ -213,9 +225,10 @@ def _check_ncci_and_modifiers(state: ClaimState) -> list[ScrubFinding]:
             if same_day_procs:
                 out.append(_finding(
                     "error", "MOD-25",
-                    f"E/M {ln.cpt_code} billed with same-day procedure "
+                    f"E/M {ln.cpt_code} billed same day as procedure "
                     f"{', '.join(sorted(same_day_procs))} requires modifier 25 on the E/M line "
-                    f"— will deny CO-97 (bundled) without it.",
+                    f"to attest a significant, separately identifiable service — will deny "
+                    f"CO-97 (bundled) without it.",
                     ln.line_no,
                 ))
 

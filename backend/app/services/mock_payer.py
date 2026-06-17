@@ -25,35 +25,62 @@ from app.schemas.claim_state import ClaimState
 # CARC / RARC catalogs (real public code meanings)
 # ──────────────────────────────────────────────────────────────────────────
 
+# Real, public Washington Publishing Company (X12) CARC meanings. A production
+# remittance engine consumes the full ~400-code list with quarterly updates;
+# this curated set covers every denial/adjustment this engine can produce plus
+# common neighbors a billing specialist routinely sees.
 CARC_DESCRIPTIONS: dict[str, str] = {
+    "1":   "Deductible amount.",
+    "2":   "Coinsurance amount.",
+    "3":   "Co-payment amount.",
     "4":   "The procedure code is inconsistent with the modifier used, or a required modifier is missing.",
+    "6":   "The procedure/revenue code is inconsistent with the patient's age.",
+    "9":   "The diagnosis is inconsistent with the patient's age.",
     "11":  "The diagnosis is inconsistent with the procedure.",
     "16":  "Claim/service lacks information or has submission/billing error(s) which is needed for adjudication.",
     "18":  "Exact duplicate claim/service.",
     "22":  "This care may be covered by another payer per coordination of benefits.",
+    "23":  "The impact of prior payer(s) adjudication including payments and/or adjustments.",
     "26":  "Expenses incurred prior to coverage.",
     "27":  "Expenses incurred after coverage terminated.",
     "29":  "The time limit for filing has expired.",
     "45":  "Charge exceeds fee schedule/maximum allowable or contracted/legislated fee arrangement.",
     "50":  "These are non-covered services because this is not deemed a 'medical necessity' by the payer.",
+    "58":  "Treatment was deemed by the payer to have been rendered in an inappropriate or invalid place of service.",
+    "59":  "Processed based on multiple or concurrent procedure rules.",
     "96":  "Non-covered charge(s).",
     "97":  "The benefit for this service is included in the payment/allowance for another service/procedure that has already been adjudicated.",
     "109": "Claim/service not covered by this payer/contractor. You must send the claim/service to the correct payer/contractor.",
+    "119": "Benefit maximum for this time period or occurrence has been reached.",
+    "140": "Patient/Insured health identification number and name do not match.",
+    "146": "Diagnosis was invalid for the date(s) of service reported.",
     "151": "Payment adjusted because the payer deems the information submitted does not support this many/frequency of services.",
+    "182": "Procedure modifier was invalid on the date of service.",
     "197": "Precertification/authorization/notification/pre-treatment absent.",
+    "204": "This service/equipment/drug is not covered under the patient's current benefit plan.",
+    "B7":  "This provider was not certified/eligible to be paid for this procedure/service on this date of service.",
+    "B15": "This service/procedure requires that a qualifying service/procedure be received and covered.",
 }
 
+# Real, public X12 RARC meanings (remark codes that accompany a CARC).
 RARC_DESCRIPTIONS: dict[str, str] = {
+    "M15":   "Separately billed services/tests have been bundled as they are considered components of the same procedure. Separate payment is not allowed.",
+    "M51":   "Missing/incomplete/invalid procedure code(s).",
     "M76":   "Missing/incomplete/invalid diagnosis or condition.",
+    "M80":   "Not covered when performed during the same session/date as a previously processed service for the patient.",
     "MA61":  "Missing/incomplete/invalid social security number or health insurance claim number.",
+    "MA63":  "Missing/incomplete/invalid principal diagnosis.",
     "MA130": "Your claim contains incomplete and/or invalid information, and no appeal rights are afforded because the claim is unprocessable.",
     "N19":   "Procedure code incidental to primary procedure.",
+    "N20":   "Service not payable with other service rendered on the same date.",
     "N30":   "Patient ineligible for this service.",
+    "N56":   "Procedure code billed is not correct/valid for the services billed or the date of service billed.",
     "N115":  "This decision was based on a Local Coverage Determination (LCD).",
     "N130":  "Consult plan benefit documents/guidelines for information about restrictions for this service.",
     "N211":  "Alert: You may not appeal this decision.",
     "N290":  "Missing/incomplete/invalid rendering provider primary identifier.",
     "N362":  "The number of Days or Units of Service exceeds our acceptable maximum.",
+    "N386":  "This decision was based on a National Coverage Determination (NCD).",
     "N522":  "Duplicate of a claim processed, or to be processed, as a crossover claim.",
 }
 
@@ -72,34 +99,79 @@ FEE_SCHEDULE: dict[str, Decimal] = {
     "85025": Decimal("16.50"),
     "80053": Decimal("22.00"),
     "80048": Decimal("17.00"),
+    "80061": Decimal("19.00"),
+    "83036": Decimal("13.00"),
+    "81002": Decimal("4.00"),
+    "36415": Decimal("3.00"),
+    "90471": Decimal("25.00"),
     "99000": Decimal("9.00"),
 }
 DEFAULT_ALLOWED_RATIO = Decimal("0.72")   # for CPTs not on the schedule
 
-# Medically Unlikely Edits — max units per day for the demo CPT universe.
+# Medically Unlikely Edits — max units of service per day per HCPCS/CPT. Values
+# reflect the order of magnitude of published CMS MUE values for these common
+# outpatient codes (single E/M per day; one panel/test per day; venipuncture
+# allows a small number per encounter).
 MUE_LIMITS: dict[str, int] = {
-    "99213": 1, "99214": 1, "99215": 1,
-    "93000": 1, "85025": 1, "80053": 1, "99000": 1,
+    "99211": 1, "99212": 1, "99213": 1, "99214": 1, "99215": 1,
+    "99202": 1, "99203": 1, "99204": 1, "99205": 1,
+    "93000": 1, "85025": 1, "80053": 1, "80048": 1, "80061": 1,
+    "83036": 1, "81002": 1, "90471": 1, "99000": 1,
+    "36415": 2,
 }
 
-# Diagnoses (by ICD-10 prefix) that support medical necessity for each CPT.
-# E/M visits accept any diagnosis; diagnostics follow LCD-style coverage.
+# Diagnoses (by ICD-10 prefix) that support medical necessity for each CPT under
+# LCD/NCD-style coverage policy. E/M visits and routine venipuncture accept any
+# diagnosis; diagnostic tests must link to a covered indication.
 MEDICAL_NECESSITY: dict[str, tuple[str, ...]] = {
-    "93000": ("I", "R00", "R06", "R07", "E11"),          # ECG: cardiac/related
-    "80053": ("E11", "E78", "I10", "N18", "K76", "R79"),  # CMP: metabolic
+    "93000": ("I", "R00", "R06", "R07", "E11"),            # ECG: cardiac/related
+    "80053": ("E11", "E78", "I10", "N18", "K76", "R79"),    # CMP: metabolic
     "85025": ("D5", "D6", "D7", "R50", "R53", "J", "E11"),  # CBC: anemia/infection
+    "80061": ("E78", "E11", "E10", "I10", "I25", "Z13.220"),  # Lipid panel
+    "83036": ("E11", "E10", "E13", "R73", "O24", "Z13.1"),    # Hemoglobin A1C
+    "81002": ("N39", "R30", "R31", "R35", "N30", "N18"),      # Urinalysis
 }
 
-# NCCI-style bundling: column-2 code is incidental to column-1 code.
-# Billing both without the bypass modifier denies the column-2 line (CO-97).
+# NCCI procedure-to-procedure (PTP) and Medicare status-indicator bundling.
+# Each entry: a column-2 code that is not separately payable when a column-1
+# code is present on the same claim.
+#   modifier_indicator "0" -> no modifier can bypass the edit (never separable)
+#   modifier_indicator "1" -> a distinct-service modifier (59/XU) may bypass
+# `bypass` is the modifier that overrides a "1" edit, or None for a "0" edit.
 NCCI_PAIRS: list[dict] = [
-    # Specimen handling is incidental to any E/M visit.
-    {"column1": ("99213", "99214", "99215"), "column2": "99000", "bypass": "59"},
+    # Specimen handling/conveyance (99000) carries Medicare status indicator B
+    # (bundled): it is never separately payable, with or without a modifier.
+    {
+        "column1": ("99211", "99212", "99213", "99214", "99215",
+                    "99202", "99203", "99204", "99205"),
+        "column2": "99000",
+        "modifier_indicator": "0",
+        "bypass": None,
+        "carc": "97",
+        "rarc": "N19",
+        "rationale": "Medicare status B (bundled) — not separately reimbursable.",
+    },
+    # Panel within a panel: the Comprehensive Metabolic Panel (80053) includes
+    # all Basic Metabolic Panel (80048) analytes; reporting both unbundles a
+    # comprehensive panel (AMA CPT panel definitions / NCCI lab edits).
+    {
+        "column1": ("80053",),
+        "column2": "80048",
+        "modifier_indicator": "1",
+        "bypass": "59",
+        "carc": "97",
+        "rarc": "M15",
+        "rationale": "CMP (80053) includes all BMP (80048) components.",
+    },
 ]
 
 # An E/M visit billed same-day as one of these procedures requires modifier 25
-# on the E/M line to attest it was significant & separately identifiable.
-PROCEDURES_REQUIRING_EM_MOD25 = ("93000",)
+# on the E/M line to attest it was significant & separately identifiable. Per
+# CPT/CMS guidance modifier 25 attaches an E/M to a same-day procedure with a
+# global period; immunization administration (90471, XXX global) is the classic
+# example most payers enforce. (A diagnostic test such as an ECG does NOT bundle
+# the E/M and does not require modifier 25.)
+PROCEDURES_REQUIRING_EM_MOD25 = ("90471",)
 E_AND_M_CODES = ("99202", "99203", "99204", "99205", "99211", "99212", "99213", "99214", "99215")
 
 PAYER_RULES: dict[str, dict] = {
@@ -263,12 +335,14 @@ def _line_denial(state: ClaimState, line) -> tuple[str, str] | None:
     if mue is not None and line.units > mue:
         return ("151", "N362")
 
-    # NCCI bundling: column-2 code incidental to a column-1 code on the claim.
+    # NCCI bundling: column-2 code not separately payable when a column-1 code
+    # is present. A "0"-indicator edit (bypass=None) can never be overridden.
     claim_cpts = {ln.cpt_code for ln in state.claim_lines}
     for pair in NCCI_PAIRS:
         if cpt == pair["column2"] and claim_cpts & set(pair["column1"]):
-            if pair["bypass"] not in line.modifiers:
-                return ("97", "N19")
+            bypass = pair.get("bypass")
+            if bypass is None or bypass not in line.modifiers:
+                return (pair.get("carc", "97"), pair.get("rarc", "N19"))
 
     # E/M without modifier 25 when billed alongside a same-day procedure.
     if cpt in E_AND_M_CODES and "25" not in line.modifiers:

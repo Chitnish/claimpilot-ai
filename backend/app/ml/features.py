@@ -13,7 +13,7 @@ from datetime import date, datetime
 import pandas as pd
 
 PAYER_KEYS = ["bluecross", "aetna", "united", "cigna", "humana"]
-CPT_UNIVERSE = ["99213", "99214", "99215", "93000", "85025", "80053", "99000"]
+CPT_UNIVERSE = ["99213", "99214", "99215", "93000", "85025", "80053", "99000", "90471"]
 
 E_AND_M = {"99202", "99203", "99204", "99205", "99211", "99212", "99213", "99214", "99215"}
 
@@ -77,8 +77,10 @@ def claim_features(state_dict: dict) -> dict:
         if cpt in E_AND_M and "25" not in mods and cpts & set(PROCEDURES_REQUIRING_EM_MOD25):
             em_mod25_missing = 1
         for pair in NCCI_PAIRS:
-            if cpt == pair["column2"] and cpts & set(pair["column1"]) and pair["bypass"] not in mods:
-                bundled_99000 = 1
+            if cpt == pair["column2"] and cpts & set(pair["column1"]):
+                bypass = pair.get("bypass")
+                if bypass is None or bypass not in mods:
+                    bundled_99000 = 1
 
         necessity = MEDICAL_NECESSITY.get(cpt)
         if necessity is not None and dxs:

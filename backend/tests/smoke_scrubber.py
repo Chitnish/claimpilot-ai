@@ -85,17 +85,29 @@ f = scrub_claim(make_state(claim_lines=[
     ClaimLine(line_no=2, cpt_code="99000", modifiers=[], icd10_codes=["E11.9"], units=1, charge=15.0)]))
 check("NCCI bundling flagged", "NCCI-01" in rules_of(f, "error"))
 
-# E/M + ECG without modifier 25
+# E/M + immunization admin (global-period procedure) without modifier 25
 f = scrub_claim(make_state(claim_lines=[
     ClaimLine(line_no=1, cpt_code="99214", modifiers=[], icd10_codes=["I10"], units=1, charge=250.0),
-    ClaimLine(line_no=2, cpt_code="93000", modifiers=[], icd10_codes=["I10"], units=1, charge=89.0)]))
+    ClaimLine(line_no=2, cpt_code="90471", modifiers=[], icd10_codes=["Z23"], units=1, charge=35.0)]))
 check("missing modifier 25 flagged", "MOD-25" in rules_of(f, "error"))
 
 # Same with modifier 25 -> clean
 f = scrub_claim(make_state(claim_lines=[
     ClaimLine(line_no=1, cpt_code="99214", modifiers=["25"], icd10_codes=["I10"], units=1, charge=250.0),
-    ClaimLine(line_no=2, cpt_code="93000", modifiers=[], icd10_codes=["I10"], units=1, charge=89.0)]))
+    ClaimLine(line_no=2, cpt_code="90471", modifiers=[], icd10_codes=["Z23"], units=1, charge=35.0)]))
 check("modifier 25 satisfies edit", "MOD-25" not in rules_of(f))
+
+# A diagnostic test (ECG 93000) does NOT bundle the E/M and needs no modifier 25
+f = scrub_claim(make_state(claim_lines=[
+    ClaimLine(line_no=1, cpt_code="99214", modifiers=[], icd10_codes=["I10"], units=1, charge=250.0),
+    ClaimLine(line_no=2, cpt_code="93000", modifiers=[], icd10_codes=["I10"], units=1, charge=89.0)]))
+check("ECG does not trigger modifier 25 edit", "MOD-25" not in rules_of(f))
+
+# Panel unbundling: BMP (80048) billed with CMP (80053) which includes it
+f = scrub_claim(make_state(claim_lines=[
+    ClaimLine(line_no=1, cpt_code="80053", modifiers=[], icd10_codes=["E11.9"], units=1, charge=52.0),
+    ClaimLine(line_no=2, cpt_code="80048", modifiers=[], icd10_codes=["E11.9"], units=1, charge=35.0)]))
+check("panel unbundling flagged", "NCCI-01" in rules_of(f, "error"))
 
 # MUE
 f = scrub_claim(make_state(claim_lines=[

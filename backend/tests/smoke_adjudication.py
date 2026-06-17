@@ -95,10 +95,10 @@ s = make_state(claim_id="c7", patient_member_id="BC700001", claim_lines=[
 r = adjudicate_claim(s)
 check("unsupported dx denies CARC 50", r["claim_denied"] and r["carc_code"] == "50" and r["rarc_code"] == "N115")
 
-# E/M without modifier 25 next to ECG -> E/M line CARC 97
+# E/M without modifier 25 next to same-day immunization admin -> E/M line CARC 97
 s = make_state(claim_id="c8", patient_member_id="BC800001", claim_lines=[
     ClaimLine(line_no=1, cpt_code="99214", modifiers=[], icd10_codes=["I10"], units=1, charge=250.0),
-    ClaimLine(line_no=2, cpt_code="93000", modifiers=[], icd10_codes=["I10"], units=1, charge=89.0),
+    ClaimLine(line_no=2, cpt_code="90471", modifiers=[], icd10_codes=["Z23"], units=1, charge=35.0),
 ])
 r = adjudicate_claim(s)
 em = next(d for d in r["line_decisions"] if d["cpt_code"] == "99214")
@@ -107,11 +107,40 @@ check("E/M w/o mod 25 denies CARC 97", em["denied"] and em["carc_code"] == "97")
 # Same claim WITH modifier 25 pays
 s = make_state(claim_id="c9", patient_member_id="BC900001", claim_lines=[
     ClaimLine(line_no=1, cpt_code="99214", modifiers=["25"], icd10_codes=["I10"], units=1, charge=250.0),
-    ClaimLine(line_no=2, cpt_code="93000", modifiers=[], icd10_codes=["I10"], units=1, charge=89.0),
+    ClaimLine(line_no=2, cpt_code="90471", modifiers=[], icd10_codes=["Z23"], units=1, charge=35.0),
 ])
 r = adjudicate_claim(s)
 em = next(d for d in r["line_decisions"] if d["cpt_code"] == "99214")
 check("E/M with mod 25 pays", not em["denied"])
+
+# A diagnostic ECG does NOT bundle the E/M -> E/M pays without modifier 25
+s = make_state(claim_id="c8b", patient_member_id="BC811001", claim_lines=[
+    ClaimLine(line_no=1, cpt_code="99214", modifiers=[], icd10_codes=["I10"], units=1, charge=250.0),
+    ClaimLine(line_no=2, cpt_code="93000", modifiers=[], icd10_codes=["I10"], units=1, charge=89.0),
+])
+r = adjudicate_claim(s)
+em = next(d for d in r["line_decisions"] if d["cpt_code"] == "99214")
+check("ECG does not bundle E/M", not em["denied"])
+
+# Panel unbundling: BMP (80048) billed with CMP (80053) -> 80048 line CARC 97 / M15
+s = make_state(claim_id="c11", patient_member_id="BC110501", claim_lines=[
+    ClaimLine(line_no=1, cpt_code="99213", modifiers=[], icd10_codes=["E11.9"], units=1, charge=185.0),
+    ClaimLine(line_no=2, cpt_code="80053", modifiers=[], icd10_codes=["E11.9"], units=1, charge=52.0),
+    ClaimLine(line_no=3, cpt_code="80048", modifiers=[], icd10_codes=["E11.9"], units=1, charge=35.0),
+])
+r = adjudicate_claim(s)
+bmp = next(d for d in r["line_decisions"] if d["cpt_code"] == "80048")
+check("BMP within CMP denies CARC 97 / M15",
+      bmp["denied"] and bmp["carc_code"] == "97" and bmp["rarc_code"] == "M15")
+
+# Status-B specimen handling (99000) is never separately payable, even w/ modifier 59
+s = make_state(claim_id="c12", patient_member_id="BC120501", claim_lines=[
+    ClaimLine(line_no=1, cpt_code="99213", modifiers=[], icd10_codes=["E11.9"], units=1, charge=185.0),
+    ClaimLine(line_no=2, cpt_code="99000", modifiers=["59"], icd10_codes=["E11.9"], units=1, charge=15.0),
+])
+r = adjudicate_claim(s)
+sh = next(d for d in r["line_decisions"] if d["cpt_code"] == "99000")
+check("99000 status B denies even with modifier 59", sh["denied"] and sh["carc_code"] == "97")
 
 # ERA totals are consistent
 s = make_state(claim_id="c10", patient_member_id="BC100001")
