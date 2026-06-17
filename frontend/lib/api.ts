@@ -1,6 +1,7 @@
 import {
   agentEventSchema,
   analyticsSchema,
+  arAgingSchema,
   claimSchema,
   claimSearchResponseSchema,
   claimsListSchema,
@@ -13,6 +14,7 @@ import {
   type AgentEvent,
   type BatchUploadResponse,
   type Analytics,
+  type ArAging,
   type Claim,
   type ClaimSearchResponse,
   type CopilotChatMessage,
@@ -150,14 +152,31 @@ export async function getAnalytics(): Promise<Analytics> {
   return parseJson(response, analyticsSchema);
 }
 
-export function cms1500Url(claimId: string): string {
+function actorQuery(): string {
   const actor = getActor();
-  const query = new URLSearchParams({
+  return new URLSearchParams({
     actor_id: actor.id,
     actor_name: actor.name,
     actor_role: actor.role,
-  });
-  return `${API_BASE}/claims/${claimId}/cms1500?${query.toString()}`;
+  }).toString();
+}
+
+export function cms1500Url(claimId: string): string {
+  return `${API_BASE}/claims/${claimId}/cms1500?${actorQuery()}`;
+}
+
+export function statementUrl(claimId: string): string {
+  return `${API_BASE}/claims/${claimId}/statement?${actorQuery()}`;
+}
+
+export async function getArAging(): Promise<ArAging> {
+  const response = await fetch(`${API_BASE}/ar/aging`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load A/R aging (${response.status})`);
+  }
+
+  return parseJson(response, arAgingSchema);
 }
 
 export async function getReviewQueue(): Promise<ReviewItem[]> {

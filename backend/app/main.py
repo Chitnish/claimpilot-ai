@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 import asyncio, json, os, shutil, uuid
+from datetime import date, datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -216,6 +217,21 @@ async def upload_batch(files: list[UploadFile] = File(...)):
     return {"batch_size": len(results), "claims": results}
 
 
+def _persist_ar_fields(state: ClaimState) -> None:
+    """Guarded write of patient A/R columns (no-op until migration 0004 is applied)."""
+    if not (state.ar_status or state.patient_balance):
+        return
+    try:
+        get_supabase().table("claims").update({
+            "patient_responsibility": state.patient_responsibility,
+            "patient_balance":        state.patient_balance,
+            "ar_status":              state.ar_status or None,
+            "statement_date":         state.statement_date or None,
+        }).eq("id", state.claim_id).execute()
+    except Exception as e:
+        print(f"[pipeline] A/R column update skipped: {e}")
+
+
 def _persist_claim_row(state: ClaimState) -> None:
     try:
         get_supabase().table("claims").update({
@@ -258,6 +274,7 @@ async def _stream_pipeline(claim_id: str, state: ClaimState, thread_id: str) -> 
             asyncio.create_task(save_claim_state(current.model_dump()))
 
         _persist_claim_row(final_state)
+        _persist_ar_fields(final_state)
         await save_claim_state(final_state.model_dump())
         # SSE generators detect paused/terminal state themselves.
 
@@ -555,6 +572,93 @@ async def download_cms1500(
                         filename=f"cms1500_{claim_id[:8]}.pdf")
 
 
+@app.get("/claims/{claim_id}/statement")
+async def download_statement(
+    claim_id: str,
+    actor_id: str = "",
+    actor_name: str = "",
+    actor_role: str = "",
+):
+    state = _get_state(claim_id)
+    if not state or not state.patient_statement_path:
+        raise HTTPException(404, "Patient statement not generated yet")
+    await log_audit_event(
+        claim_id, state.org_id, actor_id, actor_name, actor_role,
+        "download_statement", f"Downloaded patient statement for claim {claim_id[:8]}",
+    )
+    return FileResponse(state.patient_statement_path, media_type="application/pdf",
+                        filename=f"statement_{claim_id[:8]}.pdf")
+
+
+@app.get("/ar/aging")
+async def ar_aging():
+    """
+    Patient accounts-receivable aging report. Buckets open patient balances by
+    days since date of service (0-30 / 31-60 / 61-90 / 90+), the standard A/R
+    aging view a practice manager lives in. Reads the claims work list; degrades
+    to an empty report if the A/R columns are not present yet (migration 0004).
+    """
+    buckets = [
+        {"label": "0-30", "min": 0, "max": 30},
+        {"label": "31-60", "min": 31, "max": 60},
+        {"label": "61-90", "min": 61, "max": 90},
+        {"label": "90+", "min": 91, "max": 10**9},
+    ]
+    bucket_totals = {b["label"]: {"bucket": b["label"], "amount": 0.0, "count": 0} for b in buckets}
+    accounts: list[dict] = []
+    total_outstanding = 0.0
+
+    try:
+        rows = (
+            get_supabase()
+            .table("claims")
+            .select("id, payer_name, patient_balance, ar_status, statement_date, created_at")
+            .eq("ar_status", "open")
+            .limit(1000)
+            .execute()
+        ).data or []
+    except Exception as e:
+        # Columns absent (pre-migration) or query error — return an empty report.
+        print(f"[ar] aging query unavailable: {e}")
+        rows = []
+
+    today = date.today()
+    for r in rows:
+        balance = float(r.get("patient_balance") or 0.0)
+        if balance <= 0:
+            continue
+        ref = r.get("statement_date") or (r.get("created_at") or "")[:10]
+        ref_date = None
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
+            try:
+                ref_date = datetime.strptime((ref or "")[:10], fmt).date()
+                break
+            except ValueError:
+                continue
+        age = (today - ref_date).days if ref_date else 0
+        age = max(age, 0)
+        label = next(b["label"] for b in buckets if b["min"] <= age <= b["max"])
+        bucket_totals[label]["amount"] = round(bucket_totals[label]["amount"] + balance, 2)
+        bucket_totals[label]["count"] += 1
+        total_outstanding = round(total_outstanding + balance, 2)
+        accounts.append({
+            "claim_id": r.get("id"),
+            "payer_name": r.get("payer_name") or "",
+            "balance": round(balance, 2),
+            "age_days": age,
+            "bucket": label,
+            "statement_date": ref,
+        })
+
+    accounts.sort(key=lambda a: a["age_days"], reverse=True)
+    return {
+        "total_outstanding": total_outstanding,
+        "open_accounts": len(accounts),
+        "buckets": [bucket_totals[b["label"]] for b in buckets],
+        "accounts": accounts[:200],
+    }
+
+
 def _in_memory_review_items() -> list[dict]:
     items: list[dict] = []
     for claim_id, state in _claim_states.items():
@@ -774,14 +878,17 @@ async def resume_claim(
 
         if "variance" in reason_lower:
             # Payment already received — approving accepts the posted payment.
+            from app.agents.reconciliation import finalize_patient_ar
             state.recon_discrepancy = False
             state.status = ClaimStatus.RECONCILED
+            ar_note = finalize_patient_ar(state)
             _claim_states[claim_id] = state
             _persist_claim_row(state)
+            _persist_ar_fields(state)
             await save_claim_state(state.model_dump())
             summary = (
                 f"Reviewer accepted posted payment of ${state.amount_paid:.2f} "
-                f"(variance ${state.recon_variance:.2f} written off)."
+                f"(variance ${state.recon_variance:.2f} written off).{ar_note}"
             )
             await log_agent_event(claim_id, state.org_id, "reconciliation", "completed",
                                   summary, {"paid": state.amount_paid}, 0)

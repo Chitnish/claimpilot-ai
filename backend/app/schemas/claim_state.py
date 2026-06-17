@@ -116,6 +116,12 @@ class ClaimState(BaseModel):
     recon_discrepancy: bool = False
     recon_notes: str = ""
 
+    # Patient billing / accounts receivable
+    patient_balance: float = 0.0          # outstanding amount owed by the patient
+    patient_statement_path: str = ""      # generated patient statement PDF
+    statement_date: str = ""              # ISO date the statement was generated
+    ar_status: str = ""                   # "" | open | paid (patient A/R state)
+
     # Pipeline control
     status: ClaimStatus = ClaimStatus.DRAFT
     needs_human_review: bool = False

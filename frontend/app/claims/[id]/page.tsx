@@ -24,7 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { API_BASE, cms1500Url, getClaim } from "@/lib/api";
+import { API_BASE, cms1500Url, getClaim, statementUrl } from "@/lib/api";
 import {
   agentBadgeClass,
   denialRiskColor,
@@ -505,6 +505,31 @@ export default function ClaimDetailPage(): React.ReactElement {
                   </div>
                 )}
               </div>
+              {claim.patientBalance > 0 && (
+                <div className="space-y-1.5 rounded-md border border-[#1e3a5f]/20 bg-[#eef3fa] p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-medium text-[#1e3a5f]">
+                      <Receipt className="size-3.5" />
+                      Patient balance due
+                    </span>
+                    <span className="font-semibold text-[#1e3a5f]">
+                      {formatCurrency(claim.patientBalance)}
+                    </span>
+                  </div>
+                  {claim.arStatus && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">A/R status</span>
+                      <Badge
+                        variant={
+                          claim.arStatus === "paid" ? "success" : "warning"
+                        }
+                      >
+                        {claim.arStatus === "paid" ? "Paid" : "Open"}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              )}
               {claim.cms1500Path && (
                 <Button asChild variant="outline" className="w-full">
                   <a
@@ -514,6 +539,18 @@ export default function ClaimDetailPage(): React.ReactElement {
                   >
                     <Download className="size-4" />
                     Download CMS-1500
+                  </a>
+                </Button>
+              )}
+              {claim.patientStatementPath && (
+                <Button asChild variant="outline" className="w-full">
+                  <a
+                    href={statementUrl(claimId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Receipt className="size-4" />
+                    Download Patient Statement
                   </a>
                 </Button>
               )}

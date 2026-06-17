@@ -8,11 +8,48 @@ human review queue with an explanation a billing specialist can act on.
 """
 from __future__ import annotations
 import os, time
+from datetime import date
+from pathlib import Path
+
 from app.schemas.claim_state import ClaimState, AgentEvent, ClaimStatus
 from app.services.mock_payer import generate_era, CARC_DESCRIPTIONS
 from app.services.supabase_client import log_agent_event
 
 RECON_VARIANCE_TOLERANCE = float(os.getenv("RECON_VARIANCE_TOLERANCE", "0.05"))
+
+
+def finalize_patient_ar(state: ClaimState) -> str:
+    """
+    Open (or close) the patient A/R for a reconciled claim and generate the
+    patient statement PDF when the patient owes a balance. Returns a short
+    plain-English note for the activity feed. Safe to call on already-final
+    claims (idempotent on the statement path).
+    """
+    balance = round(state.patient_responsibility, 2)
+    state.patient_balance = balance
+
+    if balance <= 0:
+        state.ar_status = "paid"
+        return ""
+
+    state.ar_status = "open"
+    if not state.statement_date:
+        state.statement_date = date.today().isoformat()
+
+    try:
+        from app.pdf.statement import generate_statement
+        pdf_dir = Path("data/synthetic")
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path = pdf_dir / f"statement_{state.claim_id[:8]}.pdf"
+        generate_statement(state, str(pdf_path))
+        state.patient_statement_path = str(pdf_path)
+    except Exception as e:
+        print(f"[reconciliation] statement generation error: {e}")
+
+    return (
+        f" Patient statement generated — balance due ${balance:.2f} "
+        f"(copay/deductible/coinsurance) posted to patient A/R."
+    )
 
 
 async def run(state: ClaimState) -> ClaimState:
@@ -87,11 +124,7 @@ async def run(state: ClaimState) -> ClaimState:
             print(f"[reconciliation] review_queue insert error: {e}")
     else:
         state.status = ClaimStatus.RECONCILED
-        pr_note = (
-            f" Patient responsibility ${state.patient_responsibility:.2f} "
-            f"(copay/deductible/coinsurance) posted to patient ledger."
-            if state.patient_responsibility > 0 else ""
-        )
+        pr_note = finalize_patient_ar(state)
         if state.amount_paid == 0 and state.patient_responsibility > 0:
             summary = (
                 f"Reconciliation complete. Payer paid $0.00 (check {era['check_number']}) — "

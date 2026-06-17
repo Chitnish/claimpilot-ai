@@ -213,6 +213,10 @@ export const claimSchema = z
     recon_variance: z.number().nullable().optional(),
     recon_discrepancy: z.boolean().nullable().optional(),
     recon_notes: z.string().nullable().optional(),
+    patient_balance: z.number().nullable().optional(),
+    patient_statement_path: z.string().nullable().optional(),
+    statement_date: z.string().nullable().optional(),
+    ar_status: z.string().nullable().optional(),
     needs_human_review: z.boolean().nullable().optional(),
     review_reason: z.string().nullable().optional(),
     reviewer_comment: z.string().nullable().optional(),
@@ -268,6 +272,10 @@ export const claimSchema = z
     reconVariance: data.recon_variance ?? 0,
     reconDiscrepancy: data.recon_discrepancy ?? false,
     reconNotes: data.recon_notes ?? "",
+    patientBalance: data.patient_balance ?? 0,
+    patientStatementPath: data.patient_statement_path ?? "",
+    statementDate: data.statement_date ?? "",
+    arStatus: data.ar_status ?? "",
     needsHumanReview: data.needs_human_review ?? false,
     reviewReason: data.review_reason ?? "",
     reviewerComment: data.reviewer_comment ?? "",
@@ -440,3 +448,49 @@ export const analyticsSchema = z
   }));
 
 export type Analytics = z.infer<typeof analyticsSchema>;
+
+export const arAgingSchema = z
+  .object({
+    total_outstanding: z.number().default(0),
+    open_accounts: z.number().default(0),
+    buckets: z
+      .array(
+        z.object({
+          bucket: z.string(),
+          amount: z.number().default(0),
+          count: z.number().default(0),
+        }),
+      )
+      .default([]),
+    accounts: z
+      .array(
+        z.object({
+          claim_id: z.string(),
+          payer_name: z.string().default(""),
+          balance: z.number().default(0),
+          age_days: z.number().default(0),
+          bucket: z.string().default(""),
+          statement_date: z.string().default(""),
+        }),
+      )
+      .default([]),
+  })
+  .transform((data) => ({
+    totalOutstanding: data.total_outstanding,
+    openAccounts: data.open_accounts,
+    buckets: data.buckets.map((b) => ({
+      bucket: b.bucket,
+      amount: b.amount,
+      count: b.count,
+    })),
+    accounts: data.accounts.map((a) => ({
+      claimId: a.claim_id,
+      payerName: a.payer_name,
+      balance: a.balance,
+      ageDays: a.age_days,
+      bucket: a.bucket,
+      statementDate: a.statement_date,
+    })),
+  }));
+
+export type ArAging = z.infer<typeof arAgingSchema>;

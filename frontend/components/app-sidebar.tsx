@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Upload,
   UserCircle2,
+  Wallet,
 } from "lucide-react";
 
 import { getReviewQueue } from "@/lib/api";
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/claims", label: "Claims", icon: FileText },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/ar", label: "Accounts Receivable", icon: Wallet },
   { href: "/review", label: "Review", icon: ClipboardList, showBadge: true },
   { href: "/upload", label: "Upload", icon: Upload },
 ] as const;
