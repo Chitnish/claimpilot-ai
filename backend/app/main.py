@@ -12,8 +12,9 @@ from sse_starlette.sse import EventSourceResponse
 from dotenv import load_dotenv
 load_dotenv()
 
-from app.schemas.claim_state import ClaimState, ClaimStatus
+from app.schemas.claim_state import ClaimLine, ClaimState, ClaimStatus
 from app.graph.pipeline import pipeline
+from app.services.corrections import build_corrected_claim
 from app.services.security import Actor, get_actor, can_approve, DEMO_USERS
 from app.services.supabase_client import (
     get_supabase,
@@ -44,6 +45,21 @@ async def push_event(claim_id: str, event: dict) -> None:
 class ResumeDecision(BaseModel):
     approved: bool
     reviewer_comment: str = ""
+
+
+class CorrectionLine(BaseModel):
+    line_no: int
+    cpt_code: str
+    modifiers: list[str] = []
+    icd10_codes: list[str] = []
+    units: int = 1
+    charge: float = 0.0
+
+
+class CorrectionRequest(BaseModel):
+    reason: str
+    frequency_code: str = "7"   # 7=replacement, 8=void
+    claim_lines: list[CorrectionLine] | None = None
 
 
 class CopilotChatMessage(BaseModel):
@@ -865,6 +881,130 @@ only — no Markdown, no asterisks, no headers, no bullet points."""
         print(f"[resume] review_queue update error: {e}")
 
     return {"resumed": True, "approved": decision.approved}
+
+
+@app.post("/claims/{claim_id}/correct")
+async def correct_claim(
+    claim_id: str,
+    body: CorrectionRequest,
+    actor: Actor = Depends(get_actor),
+):
+    """
+    File a corrected claim (837P frequency 7 replacement / 8 void) for a denied
+    or appealed claim. Creates a NEW linked claim that references the original
+    payer claim control number and re-runs the pipeline from coding so the fix
+    is re-scrubbed and re-adjudicated — the correct workflow instead of a
+    duplicate resubmission.
+    """
+    original = _get_state(claim_id)
+    if not original:
+        raise HTTPException(404, "Claim not found")
+
+    correctable = (
+        original.status in (ClaimStatus.DENIED, ClaimStatus.APPEALED)
+        or bool(original.carc_code)
+    )
+    if not correctable:
+        raise HTTPException(
+            409, "Only denied or appealed claims can be corrected and resubmitted."
+        )
+    if original.corrected_by_claim_id:
+        raise HTTPException(
+            409,
+            f"This claim was already corrected by {original.corrected_by_claim_id[:8]}.",
+        )
+    if not body.reason.strip():
+        raise HTTPException(400, "A correction reason is required.")
+
+    corrected_lines = None
+    if body.claim_lines is not None:
+        if not body.claim_lines:
+            raise HTTPException(400, "A corrected claim must have at least one service line.")
+        corrected_lines = [ClaimLine(**ln.model_dump()) for ln in body.claim_lines]
+
+    new_state = build_corrected_claim(
+        original,
+        reason=body.reason,
+        corrected_lines=corrected_lines,
+        frequency_code=body.frequency_code,
+    )
+    new_id = new_state.claim_id
+
+    # Base claims row uses only long-standing columns; the correction columns are
+    # written separately so an un-applied migration cannot break persistence.
+    try:
+        get_supabase().table("claims").insert({
+            "id": new_id,
+            "org_id": new_state.org_id,
+            "encounter_id": None,
+            "status": new_state.status.value,
+        }).execute()
+    except Exception as e:
+        print(f"[correct] claim insert error: {e}")
+    try:
+        get_supabase().table("claims").update({
+            "frequency_code": new_state.frequency_code,
+            "original_claim_id": new_state.original_claim_id,
+            "correction_count": new_state.correction_count,
+        }).eq("id", new_id).execute()
+    except Exception as e:
+        print(f"[correct] correction-column update skipped: {e}")
+
+    _claim_events[new_id] = []
+    _claim_states[new_id] = new_state
+    _claim_queues[new_id] = asyncio.Queue()
+    _state_events_pushed[new_id] = 0
+
+    # Forward-link the original (superseded) claim and persist it.
+    original.corrected_by_claim_id = new_id
+    _claim_states[claim_id] = original
+    try:
+        get_supabase().table("claims").update({
+            "corrected_by_claim_id": new_id,
+        }).eq("id", claim_id).execute()
+    except Exception as e:
+        print(f"[correct] original forward-link update skipped: {e}")
+    await save_claim_state(original.model_dump())
+
+    # Activity trail on the original claim (so its live feed shows the action)…
+    summary_old = (
+        f"{actor.label} filed a corrected claim (frequency {new_state.frequency_code}) "
+        f"as {new_id[:8]}. Reason: {new_state.correction_reason[:120]}"
+    )
+    await log_agent_event(
+        claim_id, original.org_id, "correction", "decision", summary_old,
+        {"corrected_by_claim_id": new_id, "frequency_code": new_state.frequency_code,
+         "actor_id": actor.id, "actor_role": actor.role}, 0,
+    )
+    await push_event(claim_id, {
+        "agent": "correction", "event": "decision", "summary": summary_old,
+    })
+
+    # …and the opening event on the new corrected claim.
+    summary_new = (
+        f"Corrected claim of {claim_id[:8]} "
+        f"(original payer ref {new_state.original_payer_control_number or 'n/a'}). "
+        f"{new_state.correction_reason[:120]}"
+    )
+    await log_agent_event(
+        new_id, new_state.org_id, "correction", "started", summary_new,
+        {"original_claim_id": claim_id, "frequency_code": new_state.frequency_code}, 0,
+    )
+    await log_audit_event(
+        new_id, new_state.org_id, actor.id, actor.name, actor.role,
+        "resubmit_corrected", summary_new,
+        {"original_claim_id": claim_id, "frequency_code": new_state.frequency_code,
+         "correction_count": new_state.correction_count},
+    )
+
+    asyncio.create_task(_run_pipeline(new_id, new_state))
+
+    return {
+        "claim_id": new_id,
+        "original_claim_id": claim_id,
+        "frequency_code": new_state.frequency_code,
+        "status": new_state.status.value,
+    }
 
 
 @app.post("/claims/{claim_id}/chat")

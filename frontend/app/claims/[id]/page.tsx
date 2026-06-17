@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -11,9 +12,11 @@ import {
   Copy,
   Download,
   Info,
+  Link2,
   Loader2,
   PauseCircle,
   Receipt,
+  RefreshCw,
   ShieldAlert,
   ShieldCheck,
   Stethoscope,
@@ -43,6 +46,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PipelineDiagram } from "@/components/pipeline-diagram";
 import { ReviewCopilot } from "@/components/review-copilot";
+import { CorrectClaimPanel } from "@/components/correct-claim-panel";
 
 export default function ClaimDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
@@ -235,6 +239,59 @@ export default function ClaimDetailPage(): React.ReactElement {
             {claim.rarcReason && (
               <p className="mt-0.5 text-red-700/80">{claim.rarcReason}</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {claim.frequencyCode === "7" && claim.originalClaimId && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-[#1e3a5f]/20 bg-[#eef3fa] p-4">
+          <RefreshCw className="mt-0.5 size-5 shrink-0 text-[#1e3a5f]" />
+          <div className="text-sm">
+            <p className="font-semibold text-[#1e3a5f]">
+              Corrected claim (837P frequency 7 — replacement)
+            </p>
+            <p className="mt-0.5 text-[#1e3a5f]/80">
+              Replaces original claim{" "}
+              <Link
+                href={`/claims/${claim.originalClaimId}`}
+                className="font-medium underline underline-offset-2"
+              >
+                {truncateId(claim.originalClaimId, 12)}
+              </Link>
+              {claim.originalPayerControlNumber
+                ? ` · original payer ref ${claim.originalPayerControlNumber}`
+                : ""}
+              {claim.correctionCount > 0
+                ? ` · correction #${claim.correctionCount}`
+                : ""}
+              .
+            </p>
+            {claim.correctionReason && (
+              <p className="mt-0.5 text-[#1e3a5f]/70">
+                Reason: {claim.correctionReason}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {claim.correctedByClaimId && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <Link2 className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div className="text-sm">
+            <p className="font-semibold text-amber-800">
+              Superseded by a corrected claim
+            </p>
+            <p className="mt-0.5 text-amber-700">
+              A corrected replacement was filed for this claim —{" "}
+              <Link
+                href={`/claims/${claim.correctedByClaimId}`}
+                className="font-medium underline underline-offset-2"
+              >
+                view corrected claim {truncateId(claim.correctedByClaimId, 12)}
+              </Link>
+              .
+            </p>
           </div>
         </div>
       )}
@@ -543,6 +600,10 @@ export default function ClaimDetailPage(): React.ReactElement {
                 </CardContent>
               )}
             </Card>
+          )}
+
+          {isDenied && !claim.correctedByClaimId && (
+            <CorrectClaimPanel claim={claim} />
           )}
 
           <ReviewCopilot

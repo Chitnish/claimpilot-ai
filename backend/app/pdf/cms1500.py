@@ -60,8 +60,27 @@ def generate_cms1500(state, output_path: str) -> None:
     box(margin, top - 1.55*inch, W - 2*margin, 0.45*inch,
         "21. DIAGNOSIS OR NATURE OF ILLNESS (ICD-10-CM)", dx_str)
 
+    # ── Box 22 — Resubmission code / original ref (corrected claims only) ──
+    freq = getattr(state, "frequency_code", "1") or "1"
+    if freq in ("7", "8"):
+        orig_ref = getattr(state, "original_payer_control_number", "") or ""
+        code_label = "7 - REPLACEMENT" if freq == "7" else "8 - VOID"
+        c.setStrokeColor(colors.HexColor("#1e3a5f"))
+        c.setFillColor(colors.HexColor("#eef3fa"))
+        c.rect(margin, top - 1.95*inch, W - 2*margin, 0.32*inch, fill=1, stroke=1)
+        c.setFillColor(colors.HexColor("#1e3a5f"))
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(margin + 3, top - 1.74*inch,
+                     "22. RESUBMISSION CODE / ORIGINAL REF. NO.")
+        c.setFont("Helvetica", 8)
+        c.setFillColor(colors.black)
+        c.drawString(margin + 3, top - 1.90*inch,
+                     f"{code_label}    Original Ref. No.: {orig_ref or '—'}")
+        row_y = top - 2.45 * inch
+    else:
+        row_y = top - 2.05 * inch
+
     # ── Box 24 — Service lines header ────────────────────────────────
-    row_y = top - 2.05 * inch
     c.setFillColor(colors.HexColor("#e8eef6"))
     c.rect(margin, row_y, W - 2*margin, 0.28*inch, fill=1, stroke=0)
     c.setFillColor(colors.HexColor("#1e3a5f"))

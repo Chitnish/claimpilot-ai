@@ -196,6 +196,12 @@ export const claimSchema = z
     prior_auth_cpts: z.array(z.string()).nullable().optional(),
     prior_auth_on_file: z.boolean().nullable().optional(),
     clearinghouse_ref: z.string().nullable().optional(),
+    frequency_code: z.string().nullable().optional(),
+    original_claim_id: z.string().nullable().optional(),
+    original_payer_control_number: z.string().nullable().optional(),
+    correction_count: z.number().nullable().optional(),
+    correction_reason: z.string().nullable().optional(),
+    corrected_by_claim_id: z.string().nullable().optional(),
     carc_code: z.string().nullable().optional(),
     rarc_code: z.string().nullable().optional(),
     denial_reason: z.string().nullable().optional(),
@@ -245,6 +251,12 @@ export const claimSchema = z
     priorAuthCpts: data.prior_auth_cpts ?? [],
     priorAuthOnFile: data.prior_auth_on_file ?? false,
     clearinghouseRef: data.clearinghouse_ref ?? "",
+    frequencyCode: data.frequency_code ?? "1",
+    originalClaimId: data.original_claim_id ?? "",
+    originalPayerControlNumber: data.original_payer_control_number ?? "",
+    correctionCount: data.correction_count ?? 0,
+    correctionReason: data.correction_reason ?? "",
+    correctedByClaimId: data.corrected_by_claim_id ?? "",
     carcCode: data.carc_code ?? "",
     rarcCode: data.rarc_code ?? "",
     denialReason: data.denial_reason ?? "",
@@ -317,6 +329,22 @@ export const resumeResponseSchema = z.object({
 });
 
 export type ResumeResponse = z.infer<typeof resumeResponseSchema>;
+
+export const correctionResponseSchema = z
+  .object({
+    claim_id: z.string(),
+    original_claim_id: z.string().default(""),
+    frequency_code: z.string().default("7"),
+    status: z.string().default(""),
+  })
+  .transform((data) => ({
+    claimId: data.claim_id,
+    originalClaimId: data.original_claim_id,
+    frequencyCode: data.frequency_code,
+    status: data.status,
+  }));
+
+export type CorrectionResponse = z.infer<typeof correctionResponseSchema>;
 
 export const copilotResponseSchema = z
   .object({

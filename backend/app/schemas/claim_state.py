@@ -89,6 +89,14 @@ class ClaimState(BaseModel):
     # Fraud / anomaly
     anomaly_score: float = 0.0
 
+    # Corrected-claim resubmission (837P CLM05-3 frequency / CMS-1500 box 22)
+    frequency_code: str = "1"                  # 1=original, 7=replacement, 8=void
+    original_claim_id: str = ""                # internal id of the claim this corrects
+    original_payer_control_number: str = ""    # prior payer claim control number (ICN/DCN)
+    correction_count: int = 0                  # times this lineage has been corrected
+    correction_reason: str = ""                # why this corrected claim was filed
+    corrected_by_claim_id: str = ""            # forward link set on the superseded original
+
     # Submission / adjudication
     clearinghouse_ref: str = ""
     submission_status: str = ""

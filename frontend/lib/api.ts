@@ -5,6 +5,7 @@ import {
   claimSearchResponseSchema,
   claimsListSchema,
   copilotResponseSchema,
+  correctionResponseSchema,
   resumeResponseSchema,
   reviewQueueSchema,
   uploadResponseSchema,
@@ -16,6 +17,7 @@ import {
   type ClaimSearchResponse,
   type CopilotChatMessage,
   type CopilotResponse,
+  type CorrectionResponse,
   type ResumeResponse,
   type ReviewItem,
   type UploadResponse,
@@ -186,6 +188,39 @@ export async function resumeClaim(
   }
 
   return parseJson(response, resumeResponseSchema);
+}
+
+export interface CorrectionLineInput {
+  line_no: number;
+  cpt_code: string;
+  modifiers: string[];
+  icd10_codes: string[];
+  units: number;
+  charge: number;
+}
+
+export async function correctClaim(
+  claimId: string,
+  reason: string,
+  claimLines: CorrectionLineInput[] | null,
+): Promise<CorrectionResponse> {
+  const response = await fetch(`${API_BASE}/claims/${claimId}/correct`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
+    body: JSON.stringify({
+      reason,
+      frequency_code: "7",
+      claim_lines: claimLines,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await errorMessage(response, `Failed to correct claim (${response.status})`),
+    );
+  }
+
+  return parseJson(response, correctionResponseSchema);
 }
 
 export async function chatWithClaim(

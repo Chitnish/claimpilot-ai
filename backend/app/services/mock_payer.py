@@ -311,9 +311,22 @@ def _claim_level_denial(state: ClaimState) -> tuple[str, str] | None:
     if (date.today() - dos).days > filing_days:
         return ("29", "N211")
 
-    # Exact duplicate: same member + DOS + identical CPT set already on file.
+    # Corrected / void claims (837P frequency 7 or 8) intentionally repeat a
+    # previously submitted claim, so they must NOT trip the duplicate edit. Per
+    # payer rules a replacement/void must carry the original payer claim control
+    # number (CMS-1500 box 22 "Original Ref. No." / 837P REF*F8); without it the
+    # claim is unprocessable.
     cpt_key = ",".join(sorted(ln.cpt_code for ln in state.claim_lines))
     registry_key = (state.patient_member_id, state.date_of_service, cpt_key)
+    frequency_code = (getattr(state, "frequency_code", "1") or "1")
+    if frequency_code in ("7", "8"):
+        if not (getattr(state, "original_payer_control_number", "") or "").strip():
+            return ("16", "MA130")
+        # Replacement/void supersedes the prior claim on file.
+        _SUBMISSION_REGISTRY[registry_key] = state.claim_id
+        return None
+
+    # Exact duplicate: same member + DOS + identical CPT set already on file.
     prior = _SUBMISSION_REGISTRY.get(registry_key)
     if prior is not None and prior != state.claim_id:
         return ("18", "N522")

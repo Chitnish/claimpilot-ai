@@ -142,6 +142,23 @@ r = adjudicate_claim(s)
 sh = next(d for d in r["line_decisions"] if d["cpt_code"] == "99000")
 check("99000 status B denies even with modifier 59", sh["denied"] and sh["carc_code"] == "97")
 
+# Corrected claim (frequency 7) is NOT treated as a duplicate of the original
+orig = make_state(claim_id="orig-1", patient_member_id="BC777001", date_of_service="2026-06-07")
+adjudicate_claim(orig)  # registers the original in the duplicate registry
+corr = make_state(claim_id="corr-1", patient_member_id="BC777001", date_of_service="2026-06-07")
+corr.frequency_code = "7"
+corr.original_payer_control_number = "CLH-ABCD1234"
+r = adjudicate_claim(corr)
+check("corrected claim not flagged duplicate",
+      not (r["claim_denied"] and r["carc_code"] == "18"))
+
+# Corrected claim WITHOUT the original payer control number is unprocessable
+corr2 = make_state(claim_id="corr-2", patient_member_id="BC778001", date_of_service="2026-06-08")
+corr2.frequency_code = "7"
+r = adjudicate_claim(corr2)
+check("corrected claim missing original ref unprocessable",
+      r["claim_denied"] and r["carc_code"] == "16" and r["rarc_code"] == "MA130")
+
 # ERA totals are consistent
 s = make_state(claim_id="c10", patient_member_id="BC100001")
 adj = adjudicate_claim(s)
