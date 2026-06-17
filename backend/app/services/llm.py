@@ -1,5 +1,5 @@
 ﻿from __future__ import annotations
-import os, time
+import os, re, time
 from typing import Type, TypeVar
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -56,3 +56,20 @@ async def text_call(
     )
     latency_ms = int((time.monotonic() - t0) * 1000)
     return resp.choices[0].message.content, latency_ms
+
+
+def strip_markdown(text: str) -> str:
+    """Remove common Markdown formatting artifacts from LLM output
+    intended for plain-text display (emails, PDFs)."""
+    # Remove bold/italic asterisks and underscores
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    text = re.sub(r'__(.+?)__', r'\1', text)
+    text = re.sub(r'_(.+?)_', r'\1', text)
+    # Remove markdown headers
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # Remove bullet point markers at line start
+    text = re.sub(r'^[\*\-]\s+', '', text, flags=re.MULTILINE)
+    # Remove backticks
+    text = text.replace('`', '')
+    return text.strip()

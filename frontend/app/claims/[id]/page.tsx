@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Stethoscope,
   User,
+  XCircle,
 } from "lucide-react";
 
 import { API_BASE, cms1500Url, getClaim } from "@/lib/api";
@@ -461,6 +462,36 @@ export default function ClaimDetailPage(): React.ReactElement {
               )}
             </CardContent>
           </Card>
+
+          {claim.reviewerDecision && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Reviewer Decision</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Badge
+                  variant={
+                    claim.reviewerDecision === "approved" ? "success" : "danger"
+                  }
+                  className="gap-1"
+                >
+                  {claim.reviewerDecision === "approved" ? (
+                    <CheckCircle2 className="size-3.5" />
+                  ) : (
+                    <XCircle className="size-3.5" />
+                  )}
+                  {claim.reviewerDecision === "approved"
+                    ? "Approved"
+                    : "Rejected"}
+                </Badge>
+                {claim.reviewerComment && (
+                  <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-sm italic text-muted-foreground">
+                    {claim.reviewerComment}
+                  </blockquote>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {claim.appealLetter && (
             <Card>

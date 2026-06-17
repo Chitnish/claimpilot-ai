@@ -41,7 +41,7 @@ async def push_event(claim_id: str, event: dict) -> None:
 
 class ResumeDecision(BaseModel):
     approved: bool
-    reviewer_notes: str = ""
+    reviewer_comment: str = ""
 
 
 class CopilotChatMessage(BaseModel):
@@ -142,6 +142,56 @@ async def upload_document(file: UploadFile = File(...)):
     return {"claim_id": claim_id, "status": "processing"}
 
 
+@app.post("/claims/upload-batch")
+async def upload_batch(files: list[UploadFile] = File(...)):
+    """Accept multiple superbills, create one claim per file, run all in parallel."""
+    if not files:
+        raise HTTPException(400, "No files provided")
+
+    results = []
+    for file in files:
+        claim_id = str(uuid.uuid4())
+        suffix = Path(file.filename).suffix or ".png"
+        dest = UPLOAD_DIR / f"{claim_id}{suffix}"
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        try:
+            row = get_supabase().table("orgs").select("id").limit(1).execute()
+            org_id = row.data[0]["id"] if row.data else ""
+        except Exception:
+            org_id = ""
+
+        try:
+            get_supabase().table("claims").insert({
+                "id": claim_id,
+                "org_id": org_id,
+                "encounter_id": None,
+                "status": "draft",
+            }).execute()
+        except Exception as e:
+            print(f"[batch-upload] claim insert error: {e}")
+
+        initial_state = ClaimState(
+            claim_id=claim_id,
+            org_id=org_id,
+            document_storage_path=str(dest),
+        )
+        _claim_events[claim_id] = []
+        _claim_states[claim_id] = initial_state
+        _claim_queues[claim_id] = asyncio.Queue()
+
+        asyncio.create_task(_run_pipeline(claim_id, initial_state))
+
+        results.append({
+            "claim_id": claim_id,
+            "filename": file.filename,
+            "status": "processing",
+        })
+
+    return {"batch_size": len(results), "claims": results}
+
+
 def _persist_claim_row(state: ClaimState) -> None:
     try:
         get_supabase().table("claims").update({
@@ -154,6 +204,8 @@ def _persist_claim_row(state: ClaimState) -> None:
             "rarc_code":            state.rarc_code or None,
             "appeal_letter":        state.appeal_letter or None,
             "cms1500_path":         state.cms1500_path or None,
+            "reviewer_comment":     state.reviewer_comment or None,
+            "reviewer_decision":    state.reviewer_decision or None,
         }).eq("id", state.claim_id).execute()
     except Exception as e:
         print(f"[pipeline] claim update error: {e}")
@@ -619,12 +671,15 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
 
     review_reason = state.review_reason or ""
     reason_lower = review_reason.lower()
+    state.reviewer_comment = decision.reviewer_comment
+    state.reviewer_decision = "approved" if decision.approved else "rejected"
+    _claim_states[claim_id] = state
 
     # Audit trail: every review decision is a durable agent_runs row.
     decision_summary = (
         f"Reviewer {'APPROVED' if decision.approved else 'REJECTED'} claim — "
         f"reason under review: {review_reason or 'manual review'}."
-        + (f" Notes: {decision.reviewer_notes}" if decision.reviewer_notes else "")
+        + (f" Notes: {decision.reviewer_comment}" if decision.reviewer_comment else "")
     )
     await log_agent_event(
         claim_id, state.org_id, "human_review", "decision",
@@ -635,10 +690,20 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
     })
     _state_events_pushed[claim_id] = len(state.agent_events)
 
+    reviewer_fields = {
+        "reviewer_comment": state.reviewer_comment or None,
+        "reviewer_decision": state.reviewer_decision or None,
+    }
+
     if decision.approved:
         state.needs_human_review = False
         state.review_reason = ""
         _claim_events.setdefault(claim_id, [])
+
+        try:
+            get_supabase().table("claims").update(reviewer_fields).eq("id", claim_id).execute()
+        except Exception as e:
+            print(f"[resume] approved reviewer update error: {e}")
 
         if "variance" in reason_lower:
             # Payment already received — approving accepts the posted payment.
@@ -672,6 +737,12 @@ async def resume_claim(claim_id: str, decision: ResumeDecision):
         state.status = ClaimStatus.NEEDS_REVIEW
         state.needs_human_review = True
         _claim_states[claim_id] = state
+
+        try:
+            get_supabase().table("claims").update(reviewer_fields).eq("id", claim_id).execute()
+        except Exception as e:
+            print(f"[resume] rejected reviewer update error: {e}")
+
         # On rejection: treat as payer denial and draft appeal letter
         async def _draft_rejection_appeal():
             try:
@@ -695,12 +766,15 @@ Risk Factors: {', '.join(state.denial_risk_factors)}
 Claim Lines:
 {lines_text}
 
-Draft a complete appeal letter arguing medical necessity."""
+Draft a complete appeal letter arguing medical necessity. Output plain text
+only — no Markdown, no asterisks, no headers, no bullet points."""
                 appeal_text, _ = await text_call(
                     model=MODEL_REASONING,
                     system=APPEAL_SYSTEM,
                     user=appeal_prompt,
                 )
+                from app.services.llm import strip_markdown
+                appeal_text = strip_markdown(appeal_text)
                 state.appeal_letter = appeal_text
                 state.carc_code = "50"
                 state.status = ClaimStatus.APPEALED

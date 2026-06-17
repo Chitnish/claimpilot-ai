@@ -8,7 +8,9 @@ import {
   resumeResponseSchema,
   reviewQueueSchema,
   uploadResponseSchema,
+  batchUploadResponseSchema,
   type AgentEvent,
+  type BatchUploadResponse,
   type Analytics,
   type Claim,
   type ClaimSearchResponse,
@@ -46,6 +48,24 @@ export async function uploadClaim(file: File): Promise<UploadResponse> {
   }
 
   return parseJson(response, uploadResponseSchema);
+}
+
+export async function uploadClaimBatch(
+  files: File[],
+): Promise<BatchUploadResponse> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+
+  const response = await fetch(`${API_BASE}/claims/upload-batch`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Batch upload failed (${response.status})`);
+  }
+
+  return parseJson(response, batchUploadResponseSchema);
 }
 
 export async function getClaim(claimId: string): Promise<Claim> {
@@ -127,7 +147,7 @@ export async function resumeClaim(
   const response = await fetch(`${API_BASE}/claims/${claimId}/resume`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ approved, reviewer_notes: reviewerNotes }),
+    body: JSON.stringify({ approved, reviewer_comment: reviewerNotes }),
   });
 
   if (!response.ok) {

@@ -24,6 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 15_000;
@@ -60,6 +61,7 @@ export default function ReviewPage(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, string>>({});
 
   const loadQueue = useCallback(async (): Promise<void> => {
     try {
@@ -96,15 +98,15 @@ export default function ReviewPage(): React.ReactElement {
     approved: boolean,
   ): Promise<void> => {
     setActingOn(item.id);
+    const comment = comments[item.id]?.trim() ?? "";
     try {
-      await resumeClaim(
-        item.claimId,
-        approved,
-        approved
-          ? "Approved via review queue"
-          : "Rejected via review queue",
-      );
+      await resumeClaim(item.claimId, approved, comment);
       setItems((prev) => prev.filter((row) => row.id !== item.id));
+      setComments((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
       setToast(
         approved
           ? "Claim approved and pipeline resumed."
@@ -226,6 +228,21 @@ export default function ReviewPage(): React.ReactElement {
                       )}
                     </div>
                   )}
+
+                  <Textarea
+                    placeholder="Add a reason for your decision (optional)"
+                    rows={2}
+                    value={comments[item.id] ?? ""}
+                    className="resize-none text-sm"
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setComments((prev) => ({
+                        ...prev,
+                        [item.id]: value,
+                      }));
+                    }}
+                  />
 
                   <div className="flex gap-2 pt-1">
                     <Button

@@ -18,12 +18,20 @@ from app.services.supabase_client import log_agent_event
 
 APPEAL_SYSTEM = """You are a senior medical billing specialist drafting an insurance appeal letter.
 Write a professional, persuasive appeal that:
-1. Opens with the claim reference and denial reason (CARC code and its meaning, plus the RARC remark if present)
-2. Argues the clinical case using the SPECIFIC diagnosis and procedure codes on the claim — explain why the diagnosis supports the procedure
-3. References relevant clinical guidelines (e.g. ADA Standards of Care for diabetes monitoring, ACC/AHA for cardiac testing, USPSTF for screening) where applicable to the codes involved
-4. Requests reconsideration with a specific deadline (30 days) and notes the right to escalate to external review
+1. Opens with the claim reference and denial reason (CARC code and its meaning)
+2. Argues medical necessity citing the specific diagnosis and procedure
+3. References relevant clinical guidelines where applicable
+4. Requests reconsideration with a specific deadline (30 days)
 5. Closes professionally
-Keep the tone firm but respectful. Use real medical billing language. 3-4 paragraphs."""
+
+Keep the tone firm but respectful. Use real medical billing language. 2-3 paragraphs.
+
+CRITICAL FORMATTING RULE: Output plain text only. Do NOT use any Markdown
+formatting whatsoever — no asterisks for bold or italics, no pound signs for
+headers, no bullet points with dashes or asterisks, no backticks. Write the
+letter exactly as it would appear typed on letterhead and sent as a real
+printed or emailed business letter. Use plain paragraph breaks and standard
+punctuation only."""
 
 # CARC codes worth appealing vs. correcting & resubmitting.
 APPEALABLE_CARCS = {"50", "97", "151", "197", "11", "4", "96"}
@@ -184,6 +192,8 @@ Draft a complete appeal letter."""
         system=APPEAL_SYSTEM,
         user=appeal_prompt,
     )
+    from app.services.llm import strip_markdown
+    appeal_text = strip_markdown(appeal_text)
     state.appeal_letter = appeal_text
 
     from app.services.resend_client import send_appeal_email

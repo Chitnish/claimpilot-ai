@@ -22,6 +22,32 @@ export const uploadResponseSchema = z.object({
 
 export type UploadResponse = z.infer<typeof uploadResponseSchema>;
 
+export const batchUploadItemSchema = z
+  .object({
+    claim_id: z.string(),
+    filename: z.string(),
+    status: z.string(),
+  })
+  .transform((data) => ({
+    claimId: data.claim_id,
+    filename: data.filename,
+    status: data.status,
+  }));
+
+export type BatchUploadItem = z.infer<typeof batchUploadItemSchema>;
+
+export const batchUploadResponseSchema = z
+  .object({
+    batch_size: z.number(),
+    claims: z.array(batchUploadItemSchema),
+  })
+  .transform((data) => ({
+    batchSize: data.batch_size,
+    claims: data.claims,
+  }));
+
+export type BatchUploadResponse = z.infer<typeof batchUploadResponseSchema>;
+
 export const agentEventSchema = z.object({
   agent: z.string(),
   event: z.string(),
@@ -183,6 +209,8 @@ export const claimSchema = z
     recon_notes: z.string().nullable().optional(),
     needs_human_review: z.boolean().nullable().optional(),
     review_reason: z.string().nullable().optional(),
+    reviewer_comment: z.string().nullable().optional(),
+    reviewer_decision: z.string().nullable().optional(),
   })
   .transform((data) => ({
     claimId: data.claim_id ?? data.id ?? "",
@@ -228,6 +256,8 @@ export const claimSchema = z
     reconNotes: data.recon_notes ?? "",
     needsHumanReview: data.needs_human_review ?? false,
     reviewReason: data.review_reason ?? "",
+    reviewerComment: data.reviewer_comment ?? "",
+    reviewerDecision: data.reviewer_decision ?? "",
   }));
 
 export type Claim = z.infer<typeof claimSchema>;
