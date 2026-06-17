@@ -4,7 +4,7 @@ Multi-agent AI system for end-to-end healthcare claims automation.
 
 ## Overview
 
-ClaimPilot AI automates the full medical claims lifecycle—from superbill intake through payer submission, payment reconciliation, and appeals—using a coordinated team of specialized AI agents. A LangGraph supervisor orchestrates seven agents over a shared typed `ClaimState`, combining GPT-4o vision and reasoning with rules engines and ML models (denial-risk GradientBoosting, fraud Isolation Forest). Claims that need attention are routed to a human-in-the-loop (HITL) review queue with real interrupt/resume; the claim detail page includes a **Review Copilot** chat assistant that answers reviewer questions grounded in that claim's pipeline state. Denied claims receive GPT-4o–drafted appeal letters.
+ClaimPilot AI automates the full medical claims lifecycle—from superbill intake through payer submission, payment reconciliation, and appeals—using a coordinated team of specialized AI agents. A LangGraph supervisor orchestrates seven agents over a shared typed `ClaimState`, combining GPT-4o vision and reasoning with rules engines and ML models (denial-risk GradientBoosting, fraud Isolation Forest). Claims that need attention are routed to a human-in-the-loop (HITL) review queue with real interrupt/resume; reviewers can leave optional decision notes that persist on the claim. The claim detail page includes a **Review Copilot** chat assistant that answers reviewer questions grounded in that claim's pipeline state. Denied claims receive GPT-4o–drafted appeal letters formatted as plain text for email delivery.
 
 ## Architecture
 
@@ -39,10 +39,12 @@ ClaimPilot AI automates the full medical claims lifecycle—from superbill intak
 - GradientBoosting denial model trained on outcomes from the adjudication engine using only pre-submission features; SHAP factors rendered as billing-specialist explanations with probability impact
 - Durable ClaimState snapshots persisted to Supabase after every pipeline step — claims, CMS-1500 downloads, and review/resume survive backend restarts
 - True real-time SSE: agent events stream per graph step, with durable history in `agent_runs` and a `/claims/{id}/history` endpoint
-- Context-aware HITL resume: approving a payment variance posts the payment; approving an eligibility hold re-runs from coding; review decisions are audit-logged
-- Claim detail page shows service lines with line-level adjudication, 835 CAS adjustment codes, 271 benefits, structured scrub findings, and a **Review Copilot** chat panel for human reviewers
+- Context-aware HITL resume: approving a payment variance posts the payment; approving an eligibility hold re-runs from coding; review decisions are audit-logged with optional **reviewer comments** stored on `ClaimState` and shown on the claim detail page
+- Claim detail page shows service lines with line-level adjudication, 835 CAS adjustment codes, 271 benefits, structured scrub findings, reviewer decision notes, and a **Review Copilot** chat panel for human reviewers
 - **Review Copilot** (`POST /claims/{id}/chat`): grounded Q&A over the full `ClaimState` — explains why a claim is in review, what corrections are needed, CARC/RARC denials, approve/reject tradeoffs, and billing terms (ICD-10, CPT, CARC, etc.) in plain English for non-clinical reviewers; returns structured `suggested_actions` and field citations
 - Analytics: denial rate, top CARCs, payer performance, daily volume; claims work list with search, filters, and pagination
+- **Batch upload** (`POST /claims/upload-batch`): drop multiple superbill PDFs/images at once on the Upload page — each file becomes a separate claim with its own parallel pipeline run
+- Appeal letters drafted as **plain text** (no Markdown) for clean email rendering, with a post-generation stripper as a safety net
 - Structured outputs (Pydantic schemas) on all LLM calls; per-field confidence scores on vision extraction with automatic HITL routing
 - Isolation Forest anomaly detection for cross-claim billing pattern analysis
 - CMS-1500 PDF generation via reportlab
@@ -121,9 +123,9 @@ python data/synthetic/seed.py
 
 1. Start the backend and frontend, then seed demo data to populate the dashboard with synthetic claims in various pipeline states.
 2. Open the **Dashboard** (`/dashboard`) to view portfolio metrics, denial-risk trends, and the claims table.
-3. Go to **Upload** (`/upload`) and drop a synthetic superbill PDF or image from `backend/data/synthetic/uploads/`.
+3. Go to **Upload** (`/upload`) and drop one or more synthetic superbill PDFs or images from `backend/data/synthetic/uploads/` — batch uploads spawn a separate claim per file, all processed in parallel.
 4. On the claim detail page, watch the seven-agent pipeline execute in real time via the SSE activity feed and animated pipeline diagram, then inspect service lines with line-level payer adjudication, benefits, scrub findings, and the payment breakdown. Use the **Review Copilot** to ask questions before approving or rejecting — e.g. *Why is this in review?*, *What corrections are needed?*, or *What does CARC mean?*
-5. Resolve flagged claims in the **Review Queue** (`/review`) — approve or reject to resume the graph — then inspect denial-risk factors, download the CMS-1500 PDF, and read the auto-generated appeal letter for denied claims.
+5. Resolve flagged claims in the **Review Queue** (`/review`) — approve or reject to resume the graph, optionally adding a decision comment that appears on the claim detail page — then inspect denial-risk factors, download the CMS-1500 PDF, and read the auto-generated plain-text appeal letter for denied claims.
 6. Use **Claims** (`/claims`) to search and filter the full work list, and **Analytics** (`/analytics`) for denial reasons by CARC, payer performance, and daily volume.
 
 ## Compliance Note
