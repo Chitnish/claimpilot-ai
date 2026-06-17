@@ -455,9 +455,22 @@ async def search_claims(
         raise HTTPException(500, str(e))
 
 
+# Business-impact assumptions are stated explicitly so the headline numbers are
+# defensible rather than inflated. Manual handling time is a conservative
+# industry figure for a clean claim touched end-to-end by a biller.
+MANUAL_MINUTES_PER_CLEAN_CLAIM = 12
+BILLING_HOURLY_RATE = 45
+
+
 @app.get("/analytics")
 async def analytics():
-    """Billing-department analytics computed over the claims table."""
+    """Billing-department analytics computed over the claims table.
+
+    Metrics use honest denominators: rates are computed over *adjudicated*
+    claims (those actually submitted to the payer), never over all claims
+    including drafts still in flight. Every derived/estimated number ships with
+    its definition and assumptions in `metric_definitions` for transparency.
+    """
     from collections import Counter
     from app.services.mock_payer import CARC_DESCRIPTIONS
 
@@ -465,7 +478,7 @@ async def analytics():
         rows = (
             get_supabase()
             .table("claims")
-            .select("status, payer_name, total_charge, denial_risk, carc_code, created_at")
+            .select("id, status, payer_name, total_charge, denial_risk, carc_code, created_at")
             .order("created_at", desc=True)
             .limit(1000)
             .execute()
@@ -479,8 +492,53 @@ async def analytics():
     status_counts = Counter((r.get("status") or "unknown") for r in rows)
     submitted_like = {"submitted", "denied", "appealed", "paid", "reconciled"}
     adjudicated = [r for r in rows if (r.get("status") or "") in submitted_like]
+    adjudicated_count = len(adjudicated)
     denied = [r for r in adjudicated if (r.get("status") or "") in ("denied", "appealed")]
-    denial_rate = round(len(denied) / len(adjudicated), 4) if adjudicated else 0.0
+    denial_rate = round(len(denied) / adjudicated_count, 4) if adjudicated_count else 0.0
+    # Clean-claim (first-pass acceptance) rate: of adjudicated claims, the share
+    # accepted by the payer without a denial.
+    clean_claim_rate = (
+        round((adjudicated_count - len(denied)) / adjudicated_count, 4)
+        if adjudicated_count else 0.0
+    )
+
+    # Manual-touch rate: distinct claims that hit the human review queue.
+    touched_ids: set[str] = set()
+    try:
+        rq = (
+            get_supabase().table("review_queue").select("claim_id").limit(5000).execute()
+        ).data or []
+        touched_ids = {r["claim_id"] for r in rq if r.get("claim_id")}
+    except Exception as e:
+        print(f"[analytics] review_queue touch query unavailable: {e}")
+    adjudicated_ids = {r.get("id") for r in adjudicated}
+    touched_adjudicated = len(adjudicated_ids & touched_ids)
+    touch_rate = round(touched_adjudicated / adjudicated_count, 4) if adjudicated_count else 0.0
+    auto_processed_count = adjudicated_count - touched_adjudicated
+
+    # Average measured pipeline time from real agent latencies (agent_runs).
+    avg_pipeline_seconds: float | None = None
+    try:
+        ar = (
+            get_supabase()
+            .table("agent_runs")
+            .select("claim_id, latency_ms")
+            .order("created_at", desc=True)
+            .limit(8000)
+            .execute()
+        ).data or []
+        per_claim: dict[str, float] = {}
+        for r in ar:
+            cid = r.get("claim_id")
+            if cid:
+                per_claim[cid] = per_claim.get(cid, 0.0) + (r.get("latency_ms") or 0)
+        if per_claim:
+            avg_pipeline_seconds = round(sum(per_claim.values()) / len(per_claim) / 1000.0, 1)
+    except Exception as e:
+        print(f"[analytics] agent_runs latency query unavailable: {e}")
+
+    hours_saved = round(auto_processed_count * MANUAL_MINUTES_PER_CLEAN_CLAIM / 60.0, 1)
+    cost_savings = round(hours_saved * BILLING_HOURLY_RATE, 2)
 
     risks = [r.get("denial_risk") for r in rows if r.get("denial_risk") is not None]
     avg_denial_risk = round(sum(risks) / len(risks), 4) if risks else 0.0
@@ -537,14 +595,37 @@ async def analytics():
 
     return {
         "total_claims": total_claims,
+        "adjudicated_count": adjudicated_count,
         "total_billed": total_billed,
         "denial_rate": denial_rate,
+        "clean_claim_rate": clean_claim_rate,
+        "touch_rate": touch_rate,
+        "auto_processed_count": auto_processed_count,
+        "avg_pipeline_seconds": avg_pipeline_seconds,
         "avg_denial_risk": avg_denial_risk,
         "high_risk_open": high_risk_open,
         "status_counts": dict(status_counts),
         "top_denial_reasons": top_denial_reasons,
         "payers": payers,
         "daily_volume": daily_volume,
+        "business_impact": {
+            "auto_processed_count": auto_processed_count,
+            "manual_minutes_per_claim": MANUAL_MINUTES_PER_CLEAN_CLAIM,
+            "hourly_rate": BILLING_HOURLY_RATE,
+            "hours_saved": hours_saved,
+            "cost_savings": cost_savings,
+        },
+        "metric_definitions": {
+            "denial_rate": "Denied or appealed claims ÷ adjudicated claims (claims actually submitted to a payer). Excludes drafts in progress.",
+            "clean_claim_rate": "Adjudicated claims accepted by the payer without a denial ÷ adjudicated claims (first-pass acceptance).",
+            "touch_rate": "Adjudicated claims that required a human review ÷ adjudicated claims. Lower is better.",
+            "auto_processed_count": "Adjudicated claims that completed end-to-end without any human review.",
+            "avg_pipeline_seconds": "Mean of measured per-claim agent processing time (sum of agent latencies from agent_runs). Null until claims have run.",
+            "business_impact": (
+                f"Estimate, not a guarantee: auto-processed claims × {MANUAL_MINUTES_PER_CLEAN_CLAIM} min "
+                f"assumed manual handling each, valued at ${BILLING_HOURLY_RATE}/hr billing labor."
+            ),
+        },
     }
 
 

@@ -14,10 +14,14 @@ import {
 } from "recharts";
 import {
   AlertTriangle,
+  Clock,
   DollarSign,
   FileText,
+  Hand,
   Loader2,
+  ShieldCheck,
   TrendingDown,
+  Zap,
 } from "lucide-react";
 
 import { getAnalytics } from "@/lib/api";
@@ -156,6 +160,91 @@ export default function AnalyticsPage(): React.ReactElement {
             <p className="text-3xl font-bold">{data.highRiskOpen}</p>
             <p className="text-xs text-muted-foreground">
               ≥60% predicted denial risk, not yet submitted
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mb-2 flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-[#1e3a5f]">
+          Operational KPIs
+        </h2>
+        <span className="text-xs text-muted-foreground">
+          measured over {data.adjudicatedCount} adjudicated claims
+        </span>
+      </div>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Clean Claim Rate
+            </CardTitle>
+            <ShieldCheck className="size-4 text-emerald-600" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">
+              {data.adjudicatedCount > 0
+                ? `${Math.round(data.cleanClaimRate * 100)}%`
+                : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {data.metricDefinitions.clean_claim_rate ??
+                "First-pass payer acceptance"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Manual-Touch Rate
+            </CardTitle>
+            <Hand className="size-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">
+              {data.adjudicatedCount > 0
+                ? `${Math.round(data.touchRate * 100)}%`
+                : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Lower is better — needed human review
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Auto-Processed
+            </CardTitle>
+            <Zap className="size-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{data.autoProcessedCount}</p>
+            <p className="text-xs text-muted-foreground">
+              Touchless, end-to-end
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Avg Processing Time
+            </CardTitle>
+            <Clock className="size-4 text-[#1e3a5f]" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">
+              {data.avgPipelineSeconds === null
+                ? "—"
+                : data.avgPipelineSeconds < 60
+                  ? `${data.avgPipelineSeconds.toFixed(1)}s`
+                  : `${Math.floor(data.avgPipelineSeconds / 60)}m ${Math.round(data.avgPipelineSeconds % 60)}s`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Measured agent time per claim
             </p>
           </CardContent>
         </Card>

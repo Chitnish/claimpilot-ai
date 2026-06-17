@@ -23,7 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 
-import { listClaims } from "@/lib/api";
+import { getAnalytics, listClaims } from "@/lib/api";
 import {
   denialRiskColor,
   displayNumber,
@@ -33,7 +33,7 @@ import {
   statusBadgeVariant,
   truncateId,
 } from "@/lib/claim-ui";
-import type { Claim } from "@/lib/schemas";
+import type { Analytics, Claim } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -53,67 +53,20 @@ import {
 } from "@/components/ui/table";
 
 const POLL_INTERVAL_MS = 10_000;
-const BILLING_STAFF_HOURLY_RATE = 45;
-const MANUAL_HOURS_PER_CLAIM = 2.5;
 
-interface DashboardStats {
-  totalClaims: number;
-  cleanClaimRate: number;
-  totalBilled: number;
-  fteHoursSaved: number;
-  costSavings: number;
-  denialRate: number;
-  avgProcessingSeconds: number | null;
-}
-
-function computeStats(claims: Claim[]): DashboardStats {
-  const totalClaims = claims.length;
-  const reconciled = claims.filter((c) => c.status === "reconciled").length;
-  const cleanClaimRate =
-    totalClaims > 0 ? Math.round((reconciled / totalClaims) * 100) : 0;
-  const deniedOrAppealed = claims.filter(
-    (c) => c.status === "denied" || c.status === "appealed",
-  ).length;
-  const denialRate =
-    totalClaims > 0
-      ? Math.round((deniedOrAppealed / totalClaims) * 100)
-      : 0;
-  const totalBilled = claims.reduce(
-    (sum, c) => sum + displayNumber(c.totalCharge),
-    0,
-  );
-  const fteHoursSaved = totalClaims * MANUAL_HOURS_PER_CLAIM;
-  const costSavings = fteHoursSaved * BILLING_STAFF_HOURLY_RATE;
-
-  // avgProcessingSeconds: calculated from claim created_at vs updated_at
-  // For now use a simple estimate: if we have reconciled claims, show a fixed
-  // realistic number, otherwise null
-  const avgProcessingSeconds = reconciled > 0 ? 47 : null;
-
-  return {
-    totalClaims,
-    cleanClaimRate,
-    totalBilled,
-    fteHoursSaved,
-    costSavings,
-    denialRate,
-    avgProcessingSeconds,
-  };
+function formatDuration(seconds: number | null): string {
+  if (seconds === null) return "—";
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}m ${s}s`;
 }
 
 function statusChartData(
-  claims: Claim[],
+  statusCounts: Record<string, number>,
 ): { status: string; count: number }[] {
-  const counts = new Map<string, number>();
-  for (const claim of claims) {
-    const status = displayText(claim.status);
-    counts.set(status, (counts.get(status) ?? 0) + 1);
-  }
-  return Array.from(counts.entries())
-    .map(([status, count]) => ({
-      status: formatStatus(status),
-      count,
-    }))
+  return Object.entries(statusCounts)
+    .map(([status, count]) => ({ status: formatStatus(status), count }))
     .sort((a, b) => b.count - a.count);
 }
 
@@ -148,17 +101,22 @@ function denialRiskBucketData(
 export default function DashboardPage(): React.ReactElement {
   const router = useRouter();
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchClaims = useCallback(async (): Promise<void> => {
+  const fetchData = useCallback(async (): Promise<void> => {
     try {
-      const data = await listClaims();
-      setClaims(data);
+      const [claimsData, analyticsData] = await Promise.all([
+        listClaims(),
+        getAnalytics(),
+      ]);
+      setClaims(claimsData);
+      setAnalytics(analyticsData);
       setError(null);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to load claims";
+        err instanceof Error ? err.message : "Failed to load dashboard";
       setError(message);
     } finally {
       setLoading(false);
@@ -166,27 +124,33 @@ export default function DashboardPage(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    void fetchClaims();
+    void fetchData();
     const interval = setInterval(() => {
-      void fetchClaims();
+      void fetchData();
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [fetchClaims]);
+  }, [fetchData]);
 
-  const stats = useMemo(() => computeStats(claims), [claims]);
-  const statusData = useMemo(() => statusChartData(claims), [claims]);
+  const statusData = useMemo(
+    () => (analytics ? statusChartData(analytics.statusCounts) : []),
+    [analytics],
+  );
   const riskBucketData = useMemo(
     () => denialRiskBucketData(claims),
     [claims],
   );
 
-  if (loading) {
+  if (loading || !analytics) {
     return (
       <div className="flex min-h-full items-center justify-center p-8">
         <Loader2 className="size-8 animate-spin text-[#1e3a5f]" />
       </div>
     );
   }
+
+  const cleanClaimPct = Math.round(analytics.cleanClaimRate * 100);
+  const denialPct = Math.round(analytics.denialRate * 100);
+  const touchPct = Math.round(analytics.touchRate * 100);
 
   return (
     <div className="p-6 lg:p-8">
@@ -210,7 +174,10 @@ export default function DashboardPage(): React.ReactElement {
             <FileText className="size-4 text-[#1e3a5f]" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats.totalClaims}</p>
+            <p className="text-3xl font-bold">{analytics.totalClaims}</p>
+            <p className="text-xs text-muted-foreground">
+              {analytics.adjudicatedCount} submitted to payers
+            </p>
           </CardContent>
         </Card>
 
@@ -222,7 +189,12 @@ export default function DashboardPage(): React.ReactElement {
             <ShieldCheck className="size-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats.cleanClaimRate}%</p>
+            <p className="text-3xl font-bold">
+              {analytics.adjudicatedCount > 0 ? `${cleanClaimPct}%` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              First-pass acceptance, of {analytics.adjudicatedCount} adjudicated
+            </p>
           </CardContent>
         </Card>
 
@@ -235,14 +207,10 @@ export default function DashboardPage(): React.ReactElement {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {stats.avgProcessingSeconds === null
-                ? "—"
-                : stats.avgProcessingSeconds < 60
-                  ? `${stats.avgProcessingSeconds}s`
-                  : `${Math.floor(stats.avgProcessingSeconds / 60)}m ${stats.avgProcessingSeconds % 60}s`}
+              {formatDuration(analytics.avgPipelineSeconds)}
             </p>
             <p className="text-xs text-muted-foreground">
-              Industry avg: 3-5 days
+              Measured agent time per claim
             </p>
           </CardContent>
         </Card>
@@ -256,7 +224,7 @@ export default function DashboardPage(): React.ReactElement {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {formatCurrency(stats.totalBilled)}
+              {formatCurrency(analytics.totalBilled)}
             </p>
           </CardContent>
         </Card>
@@ -267,6 +235,12 @@ export default function DashboardPage(): React.ReactElement {
           <CardTitle className="text-base text-[#1e3a5f]">
             Estimated Business Impact
           </CardTitle>
+          <CardDescription>
+            Estimate based on {analytics.autoProcessedCount} claims auto-processed
+            without human review, at {analytics.businessImpact.manualMinutesPerClaim} min
+            assumed manual handling each (${analytics.businessImpact.hourlyRate}/hr billing
+            labor). Not a guarantee.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 sm:grid-cols-3">
@@ -275,12 +249,14 @@ export default function DashboardPage(): React.ReactElement {
                 <Clock className="size-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">FTE Hours Saved</p>
+                <p className="text-sm text-muted-foreground">
+                  Est. Hours Saved
+                </p>
                 <p className="text-2xl font-bold text-[#1e3a5f]">
-                  {stats.fteHoursSaved.toFixed(1)} hrs
+                  {analytics.businessImpact.hoursSaved.toFixed(1)} hrs
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  At $45/hr avg billing staff cost
+                  From {analytics.autoProcessedCount} touchless claims
                 </p>
               </div>
             </div>
@@ -290,9 +266,11 @@ export default function DashboardPage(): React.ReactElement {
                 <DollarSign className="size-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Cost Savings</p>
+                <p className="text-sm text-muted-foreground">
+                  Est. Labor Savings
+                </p>
                 <p className="text-2xl font-bold text-[#1e3a5f]">
-                  {formatCurrency(stats.costSavings)}
+                  {formatCurrency(analytics.businessImpact.costSavings)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   vs manual processing
@@ -307,7 +285,10 @@ export default function DashboardPage(): React.ReactElement {
               <div>
                 <p className="text-sm text-muted-foreground">Denial Rate</p>
                 <p className="text-2xl font-bold text-[#1e3a5f]">
-                  {stats.denialRate}%
+                  {analytics.adjudicatedCount > 0 ? `${denialPct}%` : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {touchPct}% of claims needed review
                 </p>
               </div>
             </div>
@@ -359,7 +340,7 @@ export default function DashboardPage(): React.ReactElement {
               Denial Risk Distribution
             </CardTitle>
             <CardDescription>
-              Claims grouped by predicted denial risk
+              Recent claims grouped by predicted denial risk
             </CardDescription>
           </CardHeader>
           <CardContent>

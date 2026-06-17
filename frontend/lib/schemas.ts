@@ -398,8 +398,13 @@ export type ClaimSearchResponse = z.infer<typeof claimSearchResponseSchema>;
 export const analyticsSchema = z
   .object({
     total_claims: z.number(),
+    adjudicated_count: z.number().default(0),
     total_billed: z.number(),
     denial_rate: z.number(),
+    clean_claim_rate: z.number().default(0),
+    touch_rate: z.number().default(0),
+    auto_processed_count: z.number().default(0),
+    avg_pipeline_seconds: z.number().nullable().default(null),
     avg_denial_risk: z.number(),
     high_risk_open: z.number(),
     status_counts: z.record(z.string(), z.number()),
@@ -426,11 +431,32 @@ export const analyticsSchema = z
         billed: z.number(),
       }),
     ),
+    business_impact: z
+      .object({
+        auto_processed_count: z.number().default(0),
+        manual_minutes_per_claim: z.number().default(0),
+        hourly_rate: z.number().default(0),
+        hours_saved: z.number().default(0),
+        cost_savings: z.number().default(0),
+      })
+      .default({
+        auto_processed_count: 0,
+        manual_minutes_per_claim: 0,
+        hourly_rate: 0,
+        hours_saved: 0,
+        cost_savings: 0,
+      }),
+    metric_definitions: z.record(z.string(), z.string()).default({}),
   })
   .transform((data) => ({
     totalClaims: data.total_claims,
+    adjudicatedCount: data.adjudicated_count,
     totalBilled: data.total_billed,
     denialRate: data.denial_rate,
+    cleanClaimRate: data.clean_claim_rate,
+    touchRate: data.touch_rate,
+    autoProcessedCount: data.auto_processed_count,
+    avgPipelineSeconds: data.avg_pipeline_seconds,
     avgDenialRisk: data.avg_denial_risk,
     highRiskOpen: data.high_risk_open,
     statusCounts: data.status_counts,
@@ -447,6 +473,14 @@ export const analyticsSchema = z
       denialRate: p.denial_rate,
     })),
     dailyVolume: data.daily_volume,
+    businessImpact: {
+      autoProcessedCount: data.business_impact.auto_processed_count,
+      manualMinutesPerClaim: data.business_impact.manual_minutes_per_claim,
+      hourlyRate: data.business_impact.hourly_rate,
+      hoursSaved: data.business_impact.hours_saved,
+      costSavings: data.business_impact.cost_savings,
+    },
+    metricDefinitions: data.metric_definitions,
   }));
 
 export type Analytics = z.infer<typeof analyticsSchema>;
