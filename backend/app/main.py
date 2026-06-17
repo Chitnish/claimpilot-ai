@@ -1,12 +1,12 @@
 ﻿from __future__ import annotations
-import asyncio, json, os, shutil, uuid
+import asyncio, csv, io, json, os, shutil, uuid
 from datetime import date, datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
@@ -52,6 +52,12 @@ async def push_event(claim_id: str, event: dict) -> None:
 
 
 class ResumeDecision(BaseModel):
+    approved: bool
+    reviewer_comment: str = ""
+
+
+class BulkResumeRequest(BaseModel):
+    claim_ids: list[str]
     approved: bool
     reviewer_comment: str = ""
 
@@ -453,6 +459,80 @@ async def search_claims(
         }
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# Columns exported to CSV, in order. Kept to billing-operational fields a
+# manager or payer reconciliation needs; synthetic data only.
+_EXPORT_COLUMNS: list[tuple[str, str]] = [
+    ("id", "Claim ID"),
+    ("status", "Status"),
+    ("patient_name", "Patient"),
+    ("payer_name", "Payer"),
+    ("date_of_service", "Date of Service"),
+    ("total_charge", "Total Charge"),
+    ("amount_paid", "Amount Paid"),
+    ("patient_responsibility", "Patient Responsibility"),
+    ("denial_risk", "Denial Risk"),
+    ("carc_code", "CARC"),
+    ("rarc_code", "RARC"),
+    ("created_at", "Created"),
+]
+
+
+@app.get("/claims/export.csv")
+async def export_claims_csv(q: str = "", status: str = "", payer: str = ""):
+    """Export the filtered claims work list as CSV for management reporting.
+
+    Honors the same q/status/payer filters as the work list so a biller can
+    export exactly what they see. Returns a downloadable text/csv attachment.
+    """
+    try:
+        query = (
+            get_supabase()
+            .table("claims")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(5000)
+        )
+        if status:
+            query = query.eq("status", status)
+        if payer:
+            query = query.ilike("payer_name", f"%{payer}%")
+        rows = query.execute().data or []
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    if q:
+        needle = q.strip().lower()
+        rows = [
+            r for r in rows
+            if needle in str(r.get("id") or "").lower()
+            or needle in (r.get("payer_name") or "").lower()
+            or needle in (r.get("carc_code") or "").lower()
+        ]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([header for _, header in _EXPORT_COLUMNS])
+    for r in rows:
+        writer.writerow([_csv_cell(r.get(key)) for key, _ in _EXPORT_COLUMNS])
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    filename = f"claims_export_{stamp}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _csv_cell(value) -> str:
+    """Render a claim field for CSV: round currency/risk, blank for None."""
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    return str(value)
 
 
 # Business-impact assumptions are stated explicitly so the headline numbers are
@@ -1088,6 +1168,48 @@ only — no Markdown, no asterisks, no headers, no bullet points."""
         print(f"[resume] review_queue update error: {e}")
 
     return {"resumed": True, "approved": decision.approved}
+
+
+@app.post("/review/bulk-resume")
+async def bulk_resume(
+    req: BulkResumeRequest,
+    actor: Actor = Depends(get_actor),
+):
+    """Approve or reject many queued claims in one action.
+
+    Each claim runs through the same per-claim review logic (including RBAC and
+    audit logging) as the single-claim endpoint, so a partial failure (e.g. one
+    claim a junior biller lacks authority to approve) does not abort the batch.
+    Returns a per-claim result so the UI can show exactly what succeeded.
+    """
+    if not req.claim_ids:
+        raise HTTPException(400, "No claims selected")
+    if len(req.claim_ids) > 100:
+        raise HTTPException(400, "Cannot process more than 100 claims at once")
+
+    results: list[dict] = []
+    succeeded = 0
+    for claim_id in dict.fromkeys(req.claim_ids):  # de-dupe, preserve order
+        decision = ResumeDecision(
+            approved=req.approved, reviewer_comment=req.reviewer_comment
+        )
+        try:
+            await resume_claim(claim_id, decision, actor)
+            succeeded += 1
+            results.append({"claim_id": claim_id, "ok": True, "error": None})
+        except HTTPException as exc:
+            results.append({"claim_id": claim_id, "ok": False, "error": exc.detail})
+        except Exception as exc:  # never let one bad claim abort the batch
+            print(f"[bulk-resume] {claim_id[:8]} failed: {exc}")
+            results.append({"claim_id": claim_id, "ok": False, "error": str(exc)})
+
+    return {
+        "approved": req.approved,
+        "requested": len(req.claim_ids),
+        "succeeded": succeeded,
+        "failed": len(results) - succeeded,
+        "results": results,
+    }
 
 
 @app.post("/claims/{claim_id}/correct")

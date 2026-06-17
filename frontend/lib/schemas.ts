@@ -340,6 +340,22 @@ export const resumeResponseSchema = z.object({
 
 export type ResumeResponse = z.infer<typeof resumeResponseSchema>;
 
+export const bulkResumeResponseSchema = z.object({
+  approved: z.boolean(),
+  requested: z.number(),
+  succeeded: z.number(),
+  failed: z.number(),
+  results: z.array(
+    z.object({
+      claim_id: z.string(),
+      ok: z.boolean(),
+      error: z.string().nullable(),
+    }),
+  ),
+});
+
+export type BulkResumeResponse = z.infer<typeof bulkResumeResponseSchema>;
+
 export const correctionResponseSchema = z
   .object({
     claim_id: z.string(),

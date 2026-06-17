@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  Search,
+} from "lucide-react";
 
-import { searchClaims } from "@/lib/api";
+import { exportClaimsUrl, searchClaims } from "@/lib/api";
 import {
   denialRiskColor,
   displayNumber,
@@ -167,6 +173,24 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                   </option>
                 ))}
               </select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9"
+                disabled={total === 0}
+                asChild
+              >
+                <a
+                  href={exportClaimsUrl({
+                    q: debouncedSearch,
+                    status: statusFilter,
+                    payer: payerFilter,
+                  })}
+                >
+                  <Download className="size-4" />
+                  Export CSV
+                </a>
+              </Button>
             </div>
           </div>
         </CardHeader>

@@ -2,6 +2,7 @@ import {
   agentEventSchema,
   analyticsSchema,
   arAgingSchema,
+  bulkResumeResponseSchema,
   claimSchema,
   claimSearchResponseSchema,
   claimsListSchema,
@@ -15,6 +16,7 @@ import {
   type BatchUploadResponse,
   type Analytics,
   type ArAging,
+  type BulkResumeResponse,
   type Claim,
   type ClaimSearchResponse,
   type CopilotChatMessage,
@@ -140,6 +142,38 @@ export async function searchClaims(
   }
 
   return parseJson(response, claimSearchResponseSchema);
+}
+
+export function exportClaimsUrl(params: ClaimSearchParams): string {
+  const query = new URLSearchParams();
+  if (params.q) query.set("q", params.q);
+  if (params.status) query.set("status", params.status);
+  if (params.payer) query.set("payer", params.payer);
+  return `${API_BASE}/claims/export.csv?${query.toString()}`;
+}
+
+export async function bulkResume(
+  claimIds: string[],
+  approved: boolean,
+  reviewerNotes: string,
+): Promise<BulkResumeResponse> {
+  const response = await fetch(`${API_BASE}/review/bulk-resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
+    body: JSON.stringify({
+      claim_ids: claimIds,
+      approved,
+      reviewer_comment: reviewerNotes,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await errorMessage(response, `Bulk action failed (${response.status})`),
+    );
+  }
+
+  return parseJson(response, bulkResumeResponseSchema);
 }
 
 export async function getAnalytics(): Promise<Analytics> {

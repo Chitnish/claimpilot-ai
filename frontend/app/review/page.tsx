@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  CheckCheck,
   CheckCircle,
   Eye,
   Loader2,
+  X,
 } from "lucide-react";
 
-import { getReviewQueue, resumeClaim } from "@/lib/api";
+import { bulkResume, getReviewQueue, resumeClaim } from "@/lib/api";
 import {
   denialRiskColor,
   formatCurrency,
@@ -28,6 +30,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 15_000;
+// "Low risk" claims are the safe candidates for one-click bulk approval.
+const LOW_RISK_THRESHOLD = 0.4;
 
 interface ReasonBadgeStyle {
   className: string;
@@ -62,6 +66,8 @@ export default function ReviewPage(): React.ReactElement {
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkActing, setBulkActing] = useState(false);
 
   const loadQueue = useCallback(async (): Promise<void> => {
     try {
@@ -92,6 +98,64 @@ export default function ReviewPage(): React.ReactElement {
     const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  const toggleSelected = (itemId: string): void => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  const selectLowRisk = (): void => {
+    setSelected(
+      new Set(
+        items
+          .filter((item) => item.denialRisk < LOW_RISK_THRESHOLD)
+          .map((item) => item.id),
+      ),
+    );
+  };
+
+  const clearSelection = (): void => setSelected(new Set());
+
+  const handleBulk = async (approved: boolean): Promise<void> => {
+    const chosen = items.filter((item) => selected.has(item.id));
+    if (chosen.length === 0) {
+      return;
+    }
+    setBulkActing(true);
+    try {
+      const result = await bulkResume(
+        chosen.map((item) => item.claimId),
+        approved,
+        "",
+      );
+      const succeededClaimIds = new Set(
+        result.results.filter((r) => r.ok).map((r) => r.claim_id),
+      );
+      setItems((prev) =>
+        prev.filter((row) => !succeededClaimIds.has(row.claimId)),
+      );
+      clearSelection();
+      const verb = approved ? "approved" : "rejected";
+      setToast(
+        result.failed === 0
+          ? `${result.succeeded} claim${result.succeeded === 1 ? "" : "s"} ${verb}.`
+          : `${result.succeeded} ${verb}, ${result.failed} skipped (insufficient authority or error).`,
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Bulk action failed.";
+      setToast(message);
+    } finally {
+      setBulkActing(false);
+    }
+  };
 
   const handleDecision = async (
     item: ReviewItem,
@@ -133,7 +197,60 @@ export default function ReviewPage(): React.ReactElement {
             Claims requiring human review
           </p>
         </div>
+        {items.length > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={selectLowRisk}
+              disabled={bulkActing}
+            >
+              Select low-risk (&lt;{Math.round(LOW_RISK_THRESHOLD * 100)}%)
+            </Button>
+          </div>
+        )}
       </div>
+
+      {selected.size > 0 && (
+        <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-[#1e3a5f] px-4 py-3 text-white shadow-md">
+          <span className="text-sm font-medium">
+            {selected.size} selected
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={bulkActing}
+              onClick={() => void handleBulk(true)}
+            >
+              {bulkActing ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CheckCheck className="size-4" />
+              )}
+              Approve selected
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={bulkActing}
+              onClick={() => void handleBulk(false)}
+            >
+              Reject selected
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white hover:bg-white/10 hover:text-white"
+              disabled={bulkActing}
+              onClick={clearSelection}
+            >
+              <X className="size-4" />
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       {loading && items.length === 0 ? (
         <div className="flex justify-center py-16">
@@ -166,13 +283,23 @@ export default function ReviewPage(): React.ReactElement {
               >
                 <CardHeader className="pb-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-base">
-                        {item.patientName.trim() || "Unknown Patient"}
-                      </CardTitle>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {truncateId(item.claimId, 8)}
-                      </p>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        aria-label="Select claim for bulk action"
+                        checked={selected.has(item.id)}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleSelected(item.id)}
+                        className="mt-1 size-4 cursor-pointer rounded border-input accent-[#1e3a5f]"
+                      />
+                      <div>
+                        <CardTitle className="text-base">
+                          {item.patientName.trim() || "Unknown Patient"}
+                        </CardTitle>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {truncateId(item.claimId, 8)}
+                        </p>
+                      </div>
                     </div>
                     <Badge className={cn("shrink-0", reasonStyle.className)}>
                       {ReasonIcon && <ReasonIcon className="mr-1 size-3" />}
