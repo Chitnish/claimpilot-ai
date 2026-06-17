@@ -33,19 +33,26 @@ async def log_agent_event(
     payload: dict,
     latency_ms: int = 0,
 ) -> None:
-    """Persist an agent trace row — never raises, so a DB hiccup never kills the pipeline."""
-    try:
-        get_supabase().table("agent_runs").insert({
-            "claim_id":   claim_id,
-            "org_id":     org_id,
-            "agent":      agent,
-            "event":      event,
-            "summary":    summary,
-            "payload":    payload,
-            "latency_ms": latency_ms,
-        }).execute()
-    except Exception as exc:
-        print(f"[agent_runs log error] {exc}")
+    """Persist an agent trace row — never raises, so a DB hiccup never kills the
+    pipeline. The Supabase client call is blocking HTTP, so it runs in a worker
+    thread to keep the event loop responsive under concurrent load."""
+    row = {
+        "claim_id":   claim_id,
+        "org_id":     org_id,
+        "agent":      agent,
+        "event":      event,
+        "summary":    summary,
+        "payload":    payload,
+        "latency_ms": latency_ms,
+    }
+
+    def _insert() -> None:
+        try:
+            get_supabase().table("agent_runs").insert(row).execute()
+        except Exception as exc:
+            print(f"[agent_runs log error] {exc}")
+
+    await asyncio.to_thread(_insert)
 
 
 async def log_audit_event(

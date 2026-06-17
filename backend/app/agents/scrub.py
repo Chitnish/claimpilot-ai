@@ -8,7 +8,7 @@ Two human-review gates:
   - High ML denial risk above threshold flags for review
 """
 from __future__ import annotations
-import os, time
+import asyncio, os, time
 from pathlib import Path
 from app.schemas.claim_state import ClaimState, AgentEvent, ClaimStatus
 from app.rules.scrubber import scrub_claim
@@ -50,7 +50,8 @@ async def run(state: ClaimState) -> ClaimState:
     pdf_dir = Path("data/synthetic")
     pdf_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = pdf_dir / f"cms1500_{state.claim_id[:8]}.pdf"
-    generate_cms1500(state, str(pdf_path))
+    # reportlab rendering is blocking — keep it off the event loop.
+    await asyncio.to_thread(generate_cms1500, state, str(pdf_path))
     state.cms1500_path = str(pdf_path)
 
     latency_ms = int((time.monotonic() - t0) * 1000)

@@ -31,16 +31,24 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # In-memory store for SSE streaming (durable history lives in agent_runs)
 _claim_events: dict[str, list[dict]] = {}
 _claim_states: dict[str, ClaimState] = {}
-_claim_queues: dict[str, asyncio.Queue] = {}
+# Every claim can have MANY concurrent SSE subscribers (multiple tabs/users);
+# each gets its own queue and every event fans out to all of them.
+_claim_subscribers: dict[str, set[asyncio.Queue]] = {}
 _state_events_pushed: dict[str, int] = {}  # count of state.agent_events already streamed
 
 
 async def push_event(claim_id: str, event: dict) -> None:
-    """Push an agent event to both the SSE buffer and the live queue."""
+    """Buffer an agent event and fan it out to every live SSE subscriber.
+
+    Fan-out is synchronous (put_nowait on unbounded queues) so it never blocks
+    the pipeline and cannot interleave with a subscriber's register+backfill.
+    """
     _claim_events.setdefault(claim_id, []).append(event)
-    q = _claim_queues.get(claim_id)
-    if q:
-        await q.put(event)
+    for q in list(_claim_subscribers.get(claim_id, ())):
+        try:
+            q.put_nowait(event)
+        except Exception as exc:  # a dead/closed subscriber must never break others
+            print(f"[sse] drop event to subscriber for {claim_id[:8]}: {type(exc).__name__}")
 
 
 class ResumeDecision(BaseModel):
@@ -159,7 +167,6 @@ async def upload_document(file: UploadFile = File(...)):
     )
     _claim_events[claim_id] = []
     _claim_states[claim_id] = initial_state
-    _claim_queues[claim_id] = asyncio.Queue()
 
     # Run pipeline in background
     asyncio.create_task(_run_pipeline(claim_id, initial_state))
@@ -204,7 +211,6 @@ async def upload_batch(files: list[UploadFile] = File(...)):
         )
         _claim_events[claim_id] = []
         _claim_states[claim_id] = initial_state
-        _claim_queues[claim_id] = asyncio.Queue()
 
         asyncio.create_task(_run_pipeline(claim_id, initial_state))
 
@@ -273,8 +279,9 @@ async def _stream_pipeline(claim_id: str, state: ClaimState, thread_id: str) -> 
             # Snapshot after each node so a restart loses at most one step.
             asyncio.create_task(save_claim_state(current.model_dump()))
 
-        _persist_claim_row(final_state)
-        _persist_ar_fields(final_state)
+        # Persistence is blocking HTTP — keep it off the event loop.
+        await asyncio.to_thread(_persist_claim_row, final_state)
+        await asyncio.to_thread(_persist_ar_fields, final_state)
         await save_claim_state(final_state.model_dump())
         # SSE generators detect paused/terminal state themselves.
 
@@ -294,9 +301,15 @@ async def _run_pipeline(claim_id: str, state: ClaimState):
 
 @app.get("/claims/{claim_id}/events")
 async def stream_events(claim_id: str):
-    """SSE endpoint — streams agent events via queue for real-time delivery."""
-    q: asyncio.Queue = asyncio.Queue()
-    _claim_queues[claim_id] = q
+    """SSE endpoint — streams agent events in real time.
+
+    Supports many concurrent subscribers per claim (multiple tabs/users). Each
+    connection registers its own queue, backfills missed history atomically (so
+    no event is dropped or duplicated at hand-off), then streams live events.
+    The subscriber is always unregistered on disconnect via try/finally, so
+    closed tabs never leak queues.
+    """
+    SSE_MAX_IDLE_SECONDS = 600  # close idle streams; the browser auto-reconnects
 
     def _terminal_event(state: ClaimState | None) -> dict | None:
         if state is None:
@@ -311,42 +324,48 @@ async def stream_events(claim_id: str):
         return None
 
     async def generator():
-        # Backfill: in-memory buffer first, else durable agent_runs history.
-        buffered = _claim_events.get(claim_id)
-        if buffered:
-            for ev in buffered:
-                yield {"data": json.dumps(ev)}
-        else:
-            for ev in _history_from_db(claim_id):
-                yield {"data": json.dumps(ev)}
-            # Rehydrate from the durable snapshot (post-restart); if there is
-            # no snapshot, nothing live will arrive — close out.
-            if _get_state(claim_id) is None:
-                yield {"data": json.dumps({"agent": "system", "event": "done",
-                                           "summary": "Showing recorded history."})}
-                return
+        q: asyncio.Queue = asyncio.Queue()
+        # Register + snapshot the backfill atomically (no await in between), so a
+        # concurrent push_event cannot slip an event past the hand-off.
+        subscribers = _claim_subscribers.setdefault(claim_id, set())
+        subscribers.add(q)
+        backfill = list(_claim_events.get(claim_id, []))
+        try:
+            if backfill:
+                for ev in backfill:
+                    yield {"data": json.dumps(ev)}
+            else:
+                for ev in _history_from_db(claim_id):
+                    yield {"data": json.dumps(ev)}
+                # Post-restart with no live activity and no snapshot — close out.
+                if _get_state(claim_id) is None:
+                    yield {"data": json.dumps({"agent": "system", "event": "done",
+                                               "summary": "Showing recorded history."})}
+                    return
 
-        terminal = _terminal_event(_claim_states.get(claim_id))
-        if terminal:
-            yield {"data": json.dumps(terminal)}
-            return
-
-        # Stream new events from the queue as the pipeline produces them.
-        timeout_count = 0
-        while timeout_count < 300:
-            try:
-                ev = await asyncio.wait_for(q.get(), timeout=1.0)
-                yield {"data": json.dumps(ev)}
-                timeout_count = 0
-            except asyncio.TimeoutError:
-                timeout_count += 1
             terminal = _terminal_event(_claim_states.get(claim_id))
             if terminal:
                 yield {"data": json.dumps(terminal)}
                 return
 
-        # Cleanup
-        _claim_queues.pop(claim_id, None)
+            # Stream live events as the pipeline produces them.
+            idle = 0.0
+            while idle < SSE_MAX_IDLE_SECONDS:
+                try:
+                    ev = await asyncio.wait_for(q.get(), timeout=1.0)
+                    yield {"data": json.dumps(ev)}
+                    idle = 0.0
+                except asyncio.TimeoutError:
+                    idle += 1.0
+                terminal = _terminal_event(_claim_states.get(claim_id))
+                if terminal:
+                    yield {"data": json.dumps(terminal)}
+                    return
+        finally:
+            # Always unregister, even on client disconnect (GeneratorExit).
+            subscribers.discard(q)
+            if not subscribers:
+                _claim_subscribers.pop(claim_id, None)
 
     return EventSourceResponse(generator())
 
@@ -881,10 +900,10 @@ async def resume_claim(
             from app.agents.reconciliation import finalize_patient_ar
             state.recon_discrepancy = False
             state.status = ClaimStatus.RECONCILED
-            ar_note = finalize_patient_ar(state)
+            ar_note = await asyncio.to_thread(finalize_patient_ar, state)
             _claim_states[claim_id] = state
-            _persist_claim_row(state)
-            _persist_ar_fields(state)
+            await asyncio.to_thread(_persist_claim_row, state)
+            await asyncio.to_thread(_persist_ar_fields, state)
             await save_claim_state(state.model_dump())
             summary = (
                 f"Reviewer accepted posted payment of ${state.amount_paid:.2f} "
@@ -1059,7 +1078,6 @@ async def correct_claim(
 
     _claim_events[new_id] = []
     _claim_states[new_id] = new_state
-    _claim_queues[new_id] = asyncio.Queue()
     _state_events_pushed[new_id] = 0
 
     # Forward-link the original (superseded) claim and persist it.
