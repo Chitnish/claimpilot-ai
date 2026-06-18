@@ -17,6 +17,7 @@ import {
   PauseCircle,
   Receipt,
   RefreshCw,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Stethoscope,
@@ -24,7 +25,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { API_BASE, cms1500Url, getClaim, statementUrl } from "@/lib/api";
+import { API_BASE, cms1500Url, getClaim, sendAppealEmail, statementUrl } from "@/lib/api";
 import {
   agentBadgeClass,
   denialRiskColor,
@@ -36,6 +37,7 @@ import {
 import { agentEventSchema, type Claim, type TimelineEvent } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -60,6 +62,11 @@ export default function ClaimDetailPage(): React.ReactElement {
   const [isPaused, setIsPaused] = useState(false);
   const [appealOpen, setAppealOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editedLetter, setEditedLetter] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState(false);
+  const [appealEmailSent, setAppealEmailSent] = useState(false);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
   const isDoneRef = useRef(false);
@@ -88,6 +95,18 @@ export default function ClaimDetailPage(): React.ReactElement {
     }, 5000);
     return () => clearInterval(interval);
   }, [loadClaim]);
+
+  useEffect(() => {
+    if (claim?.appealLetter) {
+      setEditedLetter(claim.appealLetter);
+    }
+  }, [claim?.appealLetter]);
+
+  useEffect(() => {
+    if (claim) {
+      setAppealEmailSent(claim.appealEmailSent);
+    }
+  }, [claim?.appealEmailSent]);
 
   useEffect(() => {
     isDoneRef.current = false;
@@ -629,30 +648,92 @@ export default function ClaimDetailPage(): React.ReactElement {
                 <CardDescription>Generated appeal documentation</CardDescription>
               </CardHeader>
               {appealOpen && (
-                <CardContent>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                    {claim.appealLetter}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 w-full"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(claim.appealLetter);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="size-3.5 mr-1.5" /> Copied!
-                      </>
+                <CardContent className="space-y-3">
+                  <Textarea
+                    value={editedLetter}
+                    onChange={(e) => setEditedLetter(e.target.value)}
+                    rows={12}
+                    className="w-full text-sm leading-relaxed text-muted-foreground"
+                  />
+                  <div className="flex items-center gap-2">
+                    {appealEmailSent ? (
+                      <Badge variant="success" className="gap-1">
+                        <CheckCircle2 className="size-3.5" />
+                        Sent to payer
+                      </Badge>
                     ) : (
-                      <>
-                        <Copy className="size-3.5 mr-1.5" /> Copy Appeal Letter
-                      </>
+                      <Badge variant="warning" className="gap-1">
+                        Draft — not yet sent
+                      </Badge>
                     )}
-                  </Button>
+                  </div>
+                  {sendSuccess && (
+                    <p className="text-sm text-emerald-600">
+                      Appeal email sent successfully.
+                    </p>
+                  )}
+                  {sendError && (
+                    <p className="text-sm text-destructive">{sendError}</p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(editedLetter);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="size-3.5 mr-1.5" /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3.5 mr-1.5" /> Copy Appeal Letter
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"
+                      disabled={sending}
+                      onClick={() => {
+                        void (async () => {
+                          setSending(true);
+                          setSendError(null);
+                          setSendSuccess(false);
+                          try {
+                            await sendAppealEmail(claimId, editedLetter);
+                            setAppealEmailSent(true);
+                            setSendSuccess(true);
+                            void loadClaim();
+                          } catch (err) {
+                            const message =
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to send appeal email";
+                            setSendError(message);
+                          } finally {
+                            setSending(false);
+                          }
+                        })();
+                      }}
+                    >
+                      {sending ? (
+                        <>
+                          <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                          Sending…
+                        </>
+                      ) : (
+                        <>
+                          <Send className="size-3.5 mr-1.5" />
+                          Send Appeal Email
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               )}
             </Card>

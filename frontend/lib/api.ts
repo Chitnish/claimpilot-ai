@@ -243,6 +243,23 @@ export async function resumeClaim(
   return parseJson(response, resumeResponseSchema);
 }
 
+export async function sendAppealEmail(
+  claimId: string,
+  appealLetter: string,
+): Promise<{ sent: boolean }> {
+  const response = await fetch(`${API_BASE}/claims/${claimId}/send-appeal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
+    body: JSON.stringify({ appeal_letter: appealLetter }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      await errorMessage(response, `Failed to send appeal (${response.status})`),
+    );
+  }
+  return response.json();
+}
+
 export interface CorrectionLineInput {
   line_no: number;
   cpt_code: string;

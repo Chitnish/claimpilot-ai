@@ -106,6 +106,7 @@ class ClaimState(BaseModel):
     denial_reason: str = ""
     rarc_reason: str = ""
     appeal_letter: str = ""
+    appeal_email_sent: bool = False
     adjudication: dict[str, Any] = Field(default_factory=dict)  # line-level payer decisions
 
     # Reconciliation (835/ERA)

@@ -86,6 +86,10 @@ class CopilotChatRequest(BaseModel):
     messages: list[CopilotChatMessage]
 
 
+class SendAppealRequest(BaseModel):
+    appeal_letter: str
+
+
 def _get_state(claim_id: str) -> ClaimState | None:
     """In-memory state, or rehydrate the durable snapshot after a restart."""
     state = _claim_states.get(claim_id)
@@ -255,6 +259,7 @@ def _persist_claim_row(state: ClaimState) -> None:
             "carc_code":            state.carc_code or None,
             "rarc_code":            state.rarc_code or None,
             "appeal_letter":        state.appeal_letter or None,
+            "appeal_email_sent":    state.appeal_email_sent,
             "cms1500_path":         state.cms1500_path or None,
             "reviewer_comment":     state.reviewer_comment or None,
             "reviewer_decision":    state.reviewer_decision or None,
@@ -722,6 +727,53 @@ async def get_claim(claim_id: str):
     return state.model_dump()
 
 
+@app.post("/claims/{claim_id}/send-appeal")
+async def send_appeal(
+    claim_id: str,
+    request: SendAppealRequest,
+    actor: Actor = Depends(get_actor),
+):
+    state = _get_state(claim_id)
+    if not state:
+        raise HTTPException(404, "Claim not found")
+
+    from app.services.resend_client import send_appeal_email
+
+    state.appeal_letter = request.appeal_letter
+
+    email_sent = await send_appeal_email(
+        claim_id=state.claim_id,
+        patient_name=state.patient_name,
+        payer_name=state.payer_name,
+        carc_code=state.carc_code or "50",
+        appeal_letter=request.appeal_letter,
+    )
+
+    state.appeal_email_sent = email_sent
+    _claim_states[claim_id] = state
+
+    try:
+        get_supabase().table("claims").update({
+            "appeal_letter": request.appeal_letter,
+            "appeal_email_sent": email_sent,
+        }).eq("id", claim_id).execute()
+    except Exception as e:
+        print(f"[send-appeal] DB update error: {e}")
+
+    await save_claim_state(state.model_dump())
+
+    await log_audit_event(
+        claim_id, state.org_id, actor.id, actor.name, actor.role,
+        "send_appeal_email",
+        f"Sent appeal letter for claim {claim_id[:8]}",
+    )
+
+    if not email_sent:
+        raise HTTPException(500, "Failed to send appeal email — check Resend configuration")
+
+    return {"sent": True, "claim_id": claim_id}
+
+
 @app.get("/claims")
 async def list_claims():
     try:
@@ -1101,7 +1153,6 @@ async def resume_claim(
         async def _draft_rejection_appeal():
             try:
                 from app.services.llm import text_call, MODEL_REASONING
-                from app.services.resend_client import send_appeal_email
                 from app.agents.submission import APPEAL_SYSTEM
                 lines_text = "\n".join(
                     f"  - CPT {ln.cpt_code}: ICD-10 {', '.join(ln.icd10_codes)}, ${ln.charge:.2f}"
@@ -1130,25 +1181,20 @@ only — no Markdown, no asterisks, no headers, no bullet points."""
                 from app.services.llm import strip_markdown
                 appeal_text = strip_markdown(appeal_text)
                 state.appeal_letter = appeal_text
+                state.appeal_email_sent = False
                 state.carc_code = "50"
                 state.status = ClaimStatus.APPEALED
                 _claim_states[claim_id] = state
                 summary = (
                     f"Claim rejected by reviewer. Appeal letter drafted "
-                    f"({len(appeal_text.split())} words) citing medical necessity. Sending appeal email."
+                    f"({len(appeal_text.split())} words) citing medical necessity. "
+                    f"Appeal letter ready for review and sending."
                 )
                 await log_agent_event(claim_id, state.org_id, "submission", "completed",
                                       summary, {"carc": "50"}, 0)
                 await push_event(claim_id, {
                     "agent": "submission", "event": "completed", "summary": summary,
                 })
-                await send_appeal_email(
-                    claim_id=state.claim_id,
-                    patient_name=state.patient_name,
-                    payer_name=state.payer_name,
-                    carc_code="50",
-                    appeal_letter=appeal_text,
-                )
                 _persist_claim_row(state)
                 await save_claim_state(state.model_dump())
                 await push_event(claim_id, {

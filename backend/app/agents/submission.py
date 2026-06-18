@@ -195,15 +195,7 @@ Draft a complete appeal letter."""
     from app.services.llm import strip_markdown
     appeal_text = strip_markdown(appeal_text)
     state.appeal_letter = appeal_text
-
-    from app.services.resend_client import send_appeal_email
-    email_sent = await send_appeal_email(
-        claim_id=state.claim_id,
-        patient_name=state.patient_name,
-        payer_name=state.payer_name,
-        carc_code=state.carc_code,
-        appeal_letter=appeal_text,
-    )
+    state.appeal_email_sent = False
 
     state.status = ClaimStatus.APPEALED
     latency_ms = int((time.monotonic() - t0) * 1000)
@@ -211,8 +203,8 @@ Draft a complete appeal letter."""
     appeal_summary = (
         f"Appeal letter drafted for CARC {state.carc_code} denial — "
         f"{len(appeal_text.split())} words, citing medical necessity for "
-        f"{', '.join(sorted(set(c for ln in state.claim_lines for c in ln.icd10_codes)))}."
-        + (" Appeal email sent." if email_sent else " (Email not configured.)")
+        f"{', '.join(sorted(set(c for ln in state.claim_lines for c in ln.icd10_codes)))}. "
+        f"Appeal letter ready for review and sending."
     )
     state.agent_events.append(AgentEvent(
         agent="submission", event="completed",
