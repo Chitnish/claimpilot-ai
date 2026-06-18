@@ -65,7 +65,7 @@ async def run(state: ClaimState) -> ClaimState:
         first = errors[0]
         summary = (
             f"Scrubber BLOCKED submission — {len(errors)} hard error(s), {len(warnings)} warning(s). "
-            f"First: [{first.rule}] {first.message[:110]}"
+            f"First: [{first.rule}] {first.message}"
         )
     elif warnings:
         summary = (
@@ -80,7 +80,7 @@ async def run(state: ClaimState) -> ClaimState:
 
     review_reason = ""
     if errors and not state.needs_human_review and not already_reviewed:
-        review_reason = f"Scrubber blocked submission: {len(errors)} hard error(s) — [{errors[0].rule}] {errors[0].message[:90]}"
+        review_reason = f"Scrubber blocked submission: {len(errors)} hard error(s) — [{errors[0].rule}] {errors[0].message}"
     elif (
         state.denial_risk >= DENIAL_RISK_THRESHOLD
         and not state.needs_human_review

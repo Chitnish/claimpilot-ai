@@ -79,7 +79,7 @@ async def run(state: ClaimState) -> ClaimState:
         # Claim-level denial — $0 remit; appeal or corrective action already in motion.
         summary = (
             f"ERA posted — claim denied (CARC {state.carc_code}: "
-            f"{CARC_DESCRIPTIONS.get(state.carc_code, '')[:70]}). "
+            f"{CARC_DESCRIPTIONS.get(state.carc_code, '')}). "
             f"$0.00 paid of ${era['total_billed']:.2f} billed. "
             + ("Appeal is on file." if state.appeal_letter else "Corrective action pending in review queue.")
         )
@@ -95,8 +95,8 @@ async def run(state: ClaimState) -> ClaimState:
         elif denied_lines:
             detail = "; ".join(
                 f"Line {d['line_no']} (CPT {d['cpt_code']}) denied CARC {d['carc_code']}: "
-                f"{CARC_DESCRIPTIONS.get(d['carc_code'], '')[:60]}"
-                for d in denied_lines[:2]
+                f"{CARC_DESCRIPTIONS.get(d['carc_code'], '')}"
+                for d in denied_lines
             )
         else:
             detail = "Payment does not match contracted rate."

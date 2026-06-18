@@ -69,8 +69,8 @@ async def run(state: ClaimState) -> ClaimState:
 
         denied_summary = (
             f"Claim DENIED by {state.payer_name or 'payer'}. "
-            f"CARC {state.carc_code}: {state.denial_reason[:90]} "
-            + (f"(RARC {state.rarc_code}: {state.rarc_reason[:60]})" if state.rarc_code else "")
+            f"CARC {state.carc_code}: {state.denial_reason}"
+            + (f" (RARC {state.rarc_code}: {state.rarc_reason})" if state.rarc_code else "")
         )
         state.agent_events.append(AgentEvent(
             agent="submission", event="decision",

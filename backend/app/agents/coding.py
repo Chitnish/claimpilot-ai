@@ -55,7 +55,7 @@ async def run(state: ClaimState) -> ClaimState:
     state.coding_validated = review.validated
 
     if review.issues:
-        summary = f"Coding review found {len(review.issues)} issue(s): {'; '.join(review.issues[:2])}{'...' if len(review.issues) > 2 else ''}."
+        summary = f"Coding review found {len(review.issues)} issue(s): {'; '.join(review.issues)}."
     else:
         summary = f"Coding validated — all {len(state.claim_lines)} lines pass ICD-10/CPT checks."
 

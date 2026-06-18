@@ -297,7 +297,7 @@ async def _stream_pipeline(claim_id: str, state: ClaimState, thread_id: str) -> 
         traceback.print_exc()
         await push_event(claim_id, {
             "agent": "system", "event": "error",
-            "summary": f"Pipeline error: {str(exc)[:120]}",
+            "summary": f"Pipeline error: {exc}",
         })
 
 
@@ -1297,7 +1297,7 @@ async def correct_claim(
     # Activity trail on the original claim (so its live feed shows the action)…
     summary_old = (
         f"{actor.label} filed a corrected claim (frequency {new_state.frequency_code}) "
-        f"as {new_id[:8]}. Reason: {new_state.correction_reason[:120]}"
+        f"as {new_id[:8]}. Reason: {new_state.correction_reason}"
     )
     await log_agent_event(
         claim_id, original.org_id, "correction", "decision", summary_old,
@@ -1312,7 +1312,7 @@ async def correct_claim(
     summary_new = (
         f"Corrected claim of {claim_id[:8]} "
         f"(original payer ref {new_state.original_payer_control_number or 'n/a'}). "
-        f"{new_state.correction_reason[:120]}"
+        f"{new_state.correction_reason}"
     )
     await log_agent_event(
         new_id, new_state.org_id, "correction", "started", summary_new,

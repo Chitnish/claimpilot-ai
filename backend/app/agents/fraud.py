@@ -40,7 +40,7 @@ async def run(state: ClaimState) -> ClaimState:
     if reasons:
         summary = (
             f"⚠ Fraud/abuse signals on this claim (score {anomaly_score:.0%}): "
-            + " ".join(reasons[:2])
+            + " ".join(reasons)
         )
     elif anomaly_score > ANOMALY_THRESHOLD:
         summary = (
