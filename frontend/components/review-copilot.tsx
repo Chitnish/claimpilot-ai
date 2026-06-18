@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import {
   AlertTriangle,
   Bot,
@@ -207,13 +208,19 @@ export function ReviewCopilot({
                 >
                   <div
                     className={cn(
-                      "inline-block whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed",
+                      "inline-block rounded-lg px-3 py-2 text-sm leading-relaxed",
                       turn.role === "user"
-                        ? "bg-[#1e3a5f] text-white"
+                        ? "whitespace-pre-wrap bg-[#1e3a5f] text-white"
                         : "bg-muted text-foreground",
                     )}
                   >
-                    {turn.content}
+                    {turn.role === "assistant" ? (
+                      <div className="prose prose-sm max-w-none text-left prose-headings:text-[#1e3a5f] prose-strong:text-[#1e3a5f] prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-ol:my-1.5 prose-ul:my-1.5 prose-li:my-0.5">
+                        <ReactMarkdown>{turn.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      turn.content
+                    )}
                   </div>
 
                   {turn.role === "assistant" &&
