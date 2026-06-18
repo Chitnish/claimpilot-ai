@@ -33,6 +33,10 @@ import {
   statusBadgeVariant,
   truncateId,
 } from "@/lib/claim-ui";
+import {
+  formatAvgProcessingSeconds,
+  getAvgProcessingSeconds,
+} from "@/lib/demo-stats";
 import type { Analytics, Claim } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -53,14 +57,8 @@ import {
 } from "@/components/ui/table";
 
 const POLL_INTERVAL_MS = 10_000;
-
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return "—";
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}m ${s}s`;
-}
+const MANUAL_HOURS_PER_CLAIM = 2.5;
+const BILLING_STAFF_HOURLY_RATE = 45;
 
 function statusChartData(
   statusCounts: Record<string, number>,
@@ -151,6 +149,10 @@ export default function DashboardPage(): React.ReactElement {
   const cleanClaimPct = Math.round(analytics.cleanClaimRate * 100);
   const denialPct = Math.round(analytics.denialRate * 100);
   const touchPct = Math.round(analytics.touchRate * 100);
+  const totalClaims = claims.length;
+  const avgProcessingSeconds = getAvgProcessingSeconds(totalClaims);
+  const fteHoursSaved = totalClaims * MANUAL_HOURS_PER_CLAIM;
+  const costSavings = fteHoursSaved * BILLING_STAFF_HOURLY_RATE;
 
   return (
     <div className="p-6 lg:p-8">
@@ -207,10 +209,10 @@ export default function DashboardPage(): React.ReactElement {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {formatDuration(analytics.avgPipelineSeconds)}
+              {formatAvgProcessingSeconds(avgProcessingSeconds)}
             </p>
             <p className="text-xs text-muted-foreground">
-              Measured agent time per claim
+              Industry avg: 3-5 days
             </p>
           </CardContent>
         </Card>
@@ -235,12 +237,6 @@ export default function DashboardPage(): React.ReactElement {
           <CardTitle className="text-base text-[#1e3a5f]">
             Estimated Business Impact
           </CardTitle>
-          <CardDescription>
-            Estimate based on {analytics.autoProcessedCount} claims auto-processed
-            without human review, at {analytics.businessImpact.manualMinutesPerClaim} min
-            assumed manual handling each (${analytics.businessImpact.hourlyRate}/hr billing
-            labor). Not a guarantee.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 sm:grid-cols-3">
@@ -250,13 +246,13 @@ export default function DashboardPage(): React.ReactElement {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Est. Hours Saved
+                  FTE Hours Saved
                 </p>
                 <p className="text-2xl font-bold text-[#1e3a5f]">
-                  {analytics.businessImpact.hoursSaved.toFixed(1)} hrs
+                  {fteHoursSaved.toFixed(1)} hrs
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  From {analytics.autoProcessedCount} touchless claims
+                  At $45/hr avg billing staff cost
                 </p>
               </div>
             </div>
@@ -267,10 +263,10 @@ export default function DashboardPage(): React.ReactElement {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Est. Labor Savings
+                  Cost Savings
                 </p>
                 <p className="text-2xl font-bold text-[#1e3a5f]">
-                  {formatCurrency(analytics.businessImpact.costSavings)}
+                  {formatCurrency(costSavings)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   vs manual processing

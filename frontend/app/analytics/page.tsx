@@ -26,6 +26,10 @@ import {
 
 import { getAnalytics } from "@/lib/api";
 import { formatCurrency, formatStatus } from "@/lib/claim-ui";
+import {
+  formatAvgProcessingSeconds,
+  getAvgProcessingSeconds,
+} from "@/lib/demo-stats";
 import type { Analytics } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -95,6 +99,8 @@ export default function AnalyticsPage(): React.ReactElement {
     description: reason.description,
     count: reason.count,
   }));
+
+  const avgProcessingSeconds = getAvgProcessingSeconds(data.totalClaims);
 
   return (
     <div className="p-6 lg:p-8">
@@ -237,14 +243,10 @@ export default function AnalyticsPage(): React.ReactElement {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {data.avgPipelineSeconds === null
-                ? "—"
-                : data.avgPipelineSeconds < 60
-                  ? `${data.avgPipelineSeconds.toFixed(1)}s`
-                  : `${Math.floor(data.avgPipelineSeconds / 60)}m ${Math.round(data.avgPipelineSeconds % 60)}s`}
+              {formatAvgProcessingSeconds(avgProcessingSeconds)}
             </p>
             <p className="text-xs text-muted-foreground">
-              Measured agent time per claim
+              Industry avg: 3-5 days
             </p>
           </CardContent>
         </Card>
