@@ -8,12 +8,13 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  MessageSquareWarning,
   Upload,
   UserCircle2,
   Wallet,
 } from "lucide-react";
 
-import { getReviewQueue } from "@/lib/api";
+import { getPendingDisputes, getReviewQueue } from "@/lib/api";
 import { DEMO_USERS, getActor, setActor, type DemoUser } from "@/lib/actor";
 import { cn } from "@/lib/utils";
 
@@ -25,12 +26,14 @@ const NAV_ITEMS = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/ar", label: "Accounts Receivable", icon: Wallet },
   { href: "/review", label: "Review", icon: ClipboardList, showBadge: true },
+  { href: "/disputes", label: "Disputes", icon: MessageSquareWarning, showDisputeBadge: true },
   { href: "/upload", label: "Upload", icon: Upload },
 ] as const;
 
 export function AppSidebar(): React.ReactElement {
   const pathname = usePathname();
   const [reviewCount, setReviewCount] = useState(0);
+  const [disputeCount, setDisputeCount] = useState(0);
   const [actor, setActorState] = useState<DemoUser>(DEMO_USERS[2]!);
 
   useEffect(() => {
@@ -54,13 +57,24 @@ export function AppSidebar(): React.ReactElement {
     }
   }, []);
 
+  const loadDisputeCount = useCallback(async (): Promise<void> => {
+    try {
+      const items = await getPendingDisputes();
+      setDisputeCount(items.length);
+    } catch {
+      // Keep last known count on poll failure
+    }
+  }, []);
+
   useEffect(() => {
     void loadReviewCount();
+    void loadDisputeCount();
     const interval = setInterval(() => {
       void loadReviewCount();
+      void loadDisputeCount();
     }, REVIEW_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [loadReviewCount]);
+  }, [loadReviewCount, loadDisputeCount]);
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r bg-[#1e3a5f] text-white">
@@ -75,8 +89,11 @@ export function AppSidebar(): React.ReactElement {
       <nav className="flex flex-col gap-1 p-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon, ...rest }) => {
           const showBadge = "showBadge" in rest && rest.showBadge === true;
+          const showDisputeBadge =
+            "showDisputeBadge" in rest && rest.showDisputeBadge === true;
           const active =
             pathname === href || pathname.startsWith(`${href}/`);
+          const badgeCount = showBadge ? reviewCount : showDisputeBadge ? disputeCount : 0;
           return (
             <Link
               key={href}
@@ -90,9 +107,9 @@ export function AppSidebar(): React.ReactElement {
             >
               <Icon className="size-4" />
               {label}
-              {showBadge && reviewCount > 0 && (
+              {(showBadge || showDisputeBadge) && badgeCount > 0 && (
                 <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-white">
-                  {reviewCount}
+                  {badgeCount}
                 </span>
               )}
             </Link>

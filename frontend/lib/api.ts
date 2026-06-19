@@ -12,6 +12,8 @@ import {
   reviewQueueSchema,
   uploadResponseSchema,
   batchUploadResponseSchema,
+  disputeQueueSchema,
+  resolveDisputeResponseSchema,
   type AgentEvent,
   type BatchUploadResponse,
   type Analytics,
@@ -24,6 +26,7 @@ import {
   type CorrectionResponse,
   type ResumeResponse,
   type ReviewItem,
+  type DisputeItem,
   type UploadResponse,
 } from "@/lib/schemas";
 
@@ -221,6 +224,35 @@ export async function getReviewQueue(): Promise<ReviewItem[]> {
   }
 
   return parseJson(response, reviewQueueSchema);
+}
+
+export async function getPendingDisputes(): Promise<DisputeItem[]> {
+  const response = await fetch(`${API_BASE}/disputes/pending`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load pending disputes (${response.status})`);
+  }
+
+  return parseJson(response, disputeQueueSchema);
+}
+
+export async function resolveDispute(
+  claimId: string,
+  note: string,
+): Promise<{ resolved: boolean }> {
+  const response = await fetch(`${API_BASE}/disputes/${claimId}/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
+    body: JSON.stringify({ resolution_note: note }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await errorMessage(response, `Failed to resolve dispute (${response.status})`),
+    );
+  }
+
+  return parseJson(response, resolveDisputeResponseSchema);
 }
 
 export async function resumeClaim(

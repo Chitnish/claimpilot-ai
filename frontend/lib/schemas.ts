@@ -225,6 +225,14 @@ export const claimSchema = z
     reviewer_decision: z.string().nullable().optional(),
     reviewer_name: z.string().nullable().optional(),
     reviewer_role: z.string().nullable().optional(),
+    has_pending_dispute: z.boolean().nullable().optional(),
+    dispute_thread: z.array(
+      z.object({
+        sender: z.string(),
+        message_text: z.string(),
+        created_at: z.string().optional(),
+      }),
+    ).nullable().optional(),
   })
   .transform((data) => ({
     claimId: data.claim_id ?? data.id ?? "",
@@ -286,6 +294,12 @@ export const claimSchema = z
     reviewerDecision: data.reviewer_decision ?? "",
     reviewerName: data.reviewer_name ?? "",
     reviewerRole: data.reviewer_role ?? "",
+    hasPendingDispute: data.has_pending_dispute ?? false,
+    disputeThread: (data.dispute_thread ?? []).map((msg) => ({
+      sender: msg.sender,
+      messageText: msg.message_text,
+      createdAt: msg.created_at ?? "",
+    })),
   }));
 
 export type Claim = z.infer<typeof claimSchema>;
@@ -297,6 +311,52 @@ export type ClaimsList = z.infer<typeof claimsListSchema>;
 export interface TimelineEvent extends AgentEvent {
   receivedAt: Date;
 }
+
+export const disputeMessageSchema = z
+  .object({
+    sender: z.string(),
+    message_text: z.string(),
+    created_at: z.string().optional(),
+  })
+  .transform((data) => ({
+    sender: data.sender,
+    messageText: data.message_text,
+    createdAt: data.created_at ?? "",
+  }));
+
+export type DisputeMessage = z.infer<typeof disputeMessageSchema>;
+
+export const disputeItemSchema = z
+  .object({
+    id: z.string(),
+    claim_id: z.string().optional(),
+    patient_name: z.string().default(""),
+    carc_code: z.string().default(""),
+    has_pending_dispute: z.boolean().optional(),
+    dispute_thread: z.array(disputeMessageSchema).default([]),
+    created_at: z.string().optional(),
+  })
+  .transform((data) => ({
+    id: data.id,
+    claimId: data.claim_id ?? data.id,
+    patientName: data.patient_name,
+    carcCode: data.carc_code,
+    hasPendingDispute: data.has_pending_dispute ?? true,
+    disputeThread: data.dispute_thread,
+    createdAt: data.created_at ?? "",
+  }));
+
+export type DisputeItem = z.infer<typeof disputeItemSchema>;
+
+export const disputeQueueSchema = z.array(disputeItemSchema);
+
+export type DisputeQueue = z.infer<typeof disputeQueueSchema>;
+
+export const resolveDisputeResponseSchema = z.object({
+  resolved: z.boolean(),
+});
+
+export type ResolveDisputeResponse = z.infer<typeof resolveDisputeResponseSchema>;
 
 export const reviewDetailsSchema = z.object({
   denial_risk: z.number().optional(),

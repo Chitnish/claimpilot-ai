@@ -133,6 +133,11 @@ class ClaimState(BaseModel):
     reviewer_name: str = ""      # attributable identity of the deciding reviewer
     reviewer_role: str = ""      # biller | supervisor | manager
 
+    # Dispute / appeal email thread
+    has_pending_dispute: bool = False
+    dispute_thread: list[dict] = Field(default_factory=list)
+    # each dict: {sender, message_text, created_at}
+
     # Trace log (drives live feed)
     agent_events: list[AgentEvent] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

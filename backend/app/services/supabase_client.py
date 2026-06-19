@@ -123,3 +123,28 @@ def load_claim_state(claim_id: str) -> dict | None:
         return json.loads(raw.decode("utf-8"))
     except Exception:
         return None
+
+
+async def save_dispute_message(
+    claim_id: str,
+    org_id: str,
+    sender: str,
+    message_text: str,
+    resend_email_id: str | None = None,
+) -> None:
+    """Insert a dispute thread row — best-effort, no-op if table missing."""
+    row = {
+        "claim_id": claim_id,
+        "org_id": org_id or None,
+        "sender": sender,
+        "message_text": message_text,
+        "resend_email_id": resend_email_id,
+    }
+
+    def _insert() -> None:
+        try:
+            get_supabase().table("dispute_threads").insert(row).execute()
+        except Exception as exc:
+            print(f"[dispute_threads] {sender} skipped: {type(exc).__name__}")
+
+    await asyncio.to_thread(_insert)

@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -13,7 +13,7 @@ from sse_starlette.sse import EventSourceResponse
 from dotenv import load_dotenv
 load_dotenv()
 
-from app.schemas.claim_state import ClaimLine, ClaimState, ClaimStatus
+from app.schemas.claim_state import AgentEvent, ClaimLine, ClaimState, ClaimStatus
 from app.graph.pipeline import pipeline
 from app.services.corrections import build_corrected_claim
 from app.services.security import Actor, get_actor, can_approve, DEMO_USERS
@@ -23,6 +23,7 @@ from app.services.supabase_client import (
     log_audit_event,
     load_claim_state,
     save_claim_state,
+    save_dispute_message,
 )
 
 UPLOAD_DIR = Path("data/synthetic/uploads")
@@ -49,6 +50,78 @@ async def push_event(claim_id: str, event: dict) -> None:
             q.put_nowait(event)
         except Exception as exc:  # a dead/closed subscriber must never break others
             print(f"[sse] drop event to subscriber for {claim_id[:8]}: {type(exc).__name__}")
+
+
+def _event_dedupe_key(ev: dict) -> tuple[str, str, str]:
+    return (ev.get("agent", ""), ev.get("event", ""), ev.get("summary", ""))
+
+
+def _merge_event_lists(*lists: list[dict]) -> list[dict]:
+    """Merge timelines in order, dropping exact duplicates."""
+    seen: set[tuple[str, str, str]] = set()
+    merged: list[dict] = []
+    for lst in lists:
+        for ev in lst:
+            key = _event_dedupe_key(ev)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(ev)
+    return merged
+
+
+def _events_from_snapshot(claim_id: str) -> list[dict]:
+    """Load agent_events from in-memory state or the durable ClaimState snapshot."""
+    state = _claim_states.get(claim_id)
+    if state is not None and state.agent_events:
+        return [e.model_dump() for e in state.agent_events]
+    snapshot = load_claim_state(claim_id)
+    if snapshot and snapshot.get("agent_events"):
+        return list(snapshot["agent_events"])
+    return []
+
+
+def _seed_events_from_state(claim_id: str, state: ClaimState) -> None:
+    """After rehydrate, repopulate the in-memory SSE buffer from persisted history."""
+    if not state.agent_events:
+        return
+    seeded = [e.model_dump() for e in state.agent_events]
+    mem = _claim_events.get(claim_id, [])
+    if len(seeded) >= len(mem):
+        _claim_events[claim_id] = seeded
+
+
+def _backfill_events(claim_id: str) -> list[dict]:
+    """Best available event timeline for SSE backfill (survives restarts)."""
+    snapshot_events = _events_from_snapshot(claim_id)
+    mem_events = list(_claim_events.get(claim_id, []))
+    if snapshot_events or mem_events:
+        return _merge_event_lists(snapshot_events, mem_events)
+    return _history_from_db(claim_id)
+
+
+async def _emit_agent_event(
+    state: ClaimState,
+    agent: str,
+    event: str,
+    summary: str,
+    payload: dict | None = None,
+    latency_ms: int = 0,
+) -> None:
+    """Append to ClaimState.agent_events and mirror to SSE + agent_runs."""
+    ev = AgentEvent(
+        agent=agent,
+        event=event,
+        summary=summary,
+        payload=payload or {},
+        latency_ms=latency_ms,
+    )
+    state.agent_events.append(ev)
+    dumped = ev.model_dump()
+    await push_event(state.claim_id, dumped)
+    await log_agent_event(
+        state.claim_id, state.org_id, agent, event, summary, payload or {}, latency_ms,
+    )
 
 
 class ResumeDecision(BaseModel):
@@ -90,6 +163,10 @@ class SendAppealRequest(BaseModel):
     appeal_letter: str
 
 
+class ResolveDisputeRequest(BaseModel):
+    resolution_note: str = ""
+
+
 def _get_state(claim_id: str) -> ClaimState | None:
     """In-memory state, or rehydrate the durable snapshot after a restart."""
     state = _claim_states.get(claim_id)
@@ -104,7 +181,7 @@ def _get_state(claim_id: str) -> ClaimState | None:
         print(f"[state] rehydrate error for {claim_id}: {exc}")
         return None
     _claim_states[claim_id] = state
-    _claim_events.setdefault(claim_id, [])
+    _seed_events_from_state(claim_id, state)
     _state_events_pushed.setdefault(claim_id, len(state.agent_events))
     return state
 
@@ -325,9 +402,7 @@ async def stream_events(claim_id: str):
     def _terminal_event(state: ClaimState | None) -> dict | None:
         if state is None:
             return None
-        if state.status.value in ("reconciled", "paid") or (
-            state.status.value in ("appealed", "denied") and state.anomaly_score > 0
-        ):
+        if state.status.value in ("reconciled", "paid", "appealed", "denied"):
             return {"agent": "system", "event": "done", "summary": "Pipeline complete."}
         if state.needs_human_review and state.status == ClaimStatus.NEEDS_REVIEW:
             return {"agent": "system", "event": "paused",
@@ -340,14 +415,12 @@ async def stream_events(claim_id: str):
         # concurrent push_event cannot slip an event past the hand-off.
         subscribers = _claim_subscribers.setdefault(claim_id, set())
         subscribers.add(q)
-        backfill = list(_claim_events.get(claim_id, []))
+        backfill = _backfill_events(claim_id)
         try:
             if backfill:
                 for ev in backfill:
                     yield {"data": json.dumps(ev)}
             else:
-                for ev in _history_from_db(claim_id):
-                    yield {"data": json.dumps(ev)}
                 # Post-restart with no live activity and no snapshot — close out.
                 if _get_state(claim_id) is None:
                     yield {"data": json.dumps({"agent": "system", "event": "done",
@@ -1075,11 +1148,13 @@ async def resume_claim(
         f"reason under review: {review_reason or 'manual review'}."
         + (f" Notes: {decision.reviewer_comment}" if decision.reviewer_comment else "")
     )
-    await log_agent_event(
-        claim_id, state.org_id, "human_review", "decision",
+    await _emit_agent_event(
+        state,
+        "human_review",
+        "decision",
         decision_summary,
         {"approved": decision.approved, "reason": review_reason,
-         "actor_id": actor.id, "actor_name": actor.name, "actor_role": actor.role}, 0,
+         "actor_id": actor.id, "actor_name": actor.name, "actor_role": actor.role},
     )
     await log_audit_event(
         claim_id, state.org_id, actor.id, actor.name, actor.role,
@@ -1088,9 +1163,6 @@ async def resume_claim(
         {"review_reason": review_reason, "total_charge": state.total_charge,
          "denial_risk": state.denial_risk},
     )
-    await push_event(claim_id, {
-        "agent": "human_review", "event": "decision", "summary": decision_summary,
-    })
     _state_events_pushed[claim_id] = len(state.agent_events)
 
     reviewer_fields = {
@@ -1190,11 +1262,9 @@ only — no Markdown, no asterisks, no headers, no bullet points."""
                     f"({len(appeal_text.split())} words) citing medical necessity. "
                     f"Appeal letter ready for review and sending."
                 )
-                await log_agent_event(claim_id, state.org_id, "submission", "completed",
-                                      summary, {"carc": "50"}, 0)
-                await push_event(claim_id, {
-                    "agent": "submission", "event": "completed", "summary": summary,
-                })
+                await _emit_agent_event(
+                    state, "submission", "completed", summary, {"carc": "50"},
+                )
                 _persist_claim_row(state)
                 await save_claim_state(state.model_dump())
                 await push_event(claim_id, {
@@ -1442,3 +1512,145 @@ async def claim_chat(
         "suggested_actions": response.suggested_actions,
         "latency_ms": latency_ms,
     }
+
+
+def _extract_claim_id_from_subject(subject: str) -> str | None:
+    """Parse 8-char claim id prefix from appeal email subject and resolve full UUID."""
+    import re
+    match = re.search(r"Claim ([a-f0-9]{8})", subject, re.IGNORECASE)
+    if not match:
+        return None
+    prefix = match.group(1).lower()
+    try:
+        rows = get_supabase().table("claims").select("id").execute()
+        for row in rows.data or []:
+            if str(row["id"]).lower().startswith(prefix):
+                return row["id"]
+    except Exception as e:
+        print(f"[dispute] claim_id lookup error: {e}")
+    return None
+
+
+@app.post("/webhooks/resend-inbound")
+async def resend_inbound_webhook(request: Request):
+    from app.services.dispute_handler import (
+        detect_escalation_request,
+        generate_dispute_reply,
+        last_ai_message_asked_to_escalate,
+    )
+    from app.services.resend_client import send_dispute_reply_email
+
+    payload = await request.json()
+    if payload.get("type") != "email.received":
+        return {"ignored": True}
+
+    data = payload.get("data", {})
+    subject = data.get("subject", "")
+    text_body = data.get("text", "") or data.get("html", "")
+
+    claim_id = _extract_claim_id_from_subject(subject)
+    if not claim_id:
+        print(f"[dispute] could not parse claim_id from subject: {subject}")
+        return {"error": "claim_id not found in subject"}
+
+    state = _get_state(claim_id)
+    if not state:
+        print(f"[dispute] claim not found: {claim_id}")
+        return {"error": "claim not found"}
+
+    await save_dispute_message(claim_id, state.org_id, "payer_reply", text_body)
+    state.dispute_thread.append({
+        "sender": "payer_reply",
+        "message_text": text_body,
+        "created_at": datetime.utcnow().isoformat(),
+    })
+
+    ai_reply = await generate_dispute_reply(state, state.dispute_thread, text_body)
+
+    await save_dispute_message(claim_id, state.org_id, "ai_reply", ai_reply)
+    state.dispute_thread.append({
+        "sender": "ai_reply",
+        "message_text": ai_reply,
+        "created_at": datetime.utcnow().isoformat(),
+    })
+
+    if (
+        detect_escalation_request(text_body)
+        and last_ai_message_asked_to_escalate(state.dispute_thread[:-1])
+    ):
+        state.has_pending_dispute = True
+
+    _claim_states[claim_id] = state
+    await save_claim_state(state.model_dump())
+
+    try:
+        get_supabase().table("claims").update({
+            "has_pending_dispute": state.has_pending_dispute,
+        }).eq("id", claim_id).execute()
+    except Exception as e:
+        print(f"[dispute] DB update error: {e}")
+
+    await send_dispute_reply_email(
+        claim_id, state, ai_reply, in_reply_to=data.get("message_id"),
+    )
+
+    await log_agent_event(
+        claim_id, state.org_id, "dispute", "completed",
+        f"Received payer reply, AI responded. Escalation requested: "
+        f"{state.has_pending_dispute}",
+        {}, 0,
+    )
+
+    return {"processed": True, "claim_id": claim_id}
+
+
+@app.get("/disputes/pending")
+async def list_pending_disputes():
+    try:
+        rows = get_supabase().table("claims").select("*").eq(
+            "has_pending_dispute", True,
+        ).execute()
+        items: list[dict] = []
+        for row in rows.data or []:
+            claim_id = row["id"]
+            item = dict(row)
+            state = _get_state(claim_id)
+            if state:
+                item["patient_name"] = state.patient_name
+                item["dispute_thread"] = state.dispute_thread
+                if not item.get("carc_code"):
+                    item["carc_code"] = state.carc_code
+            items.append(item)
+        return items
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/disputes/{claim_id}/resolve")
+async def resolve_dispute(
+    claim_id: str,
+    request: ResolveDisputeRequest,
+    actor: Actor = Depends(get_actor),
+):
+    state = _get_state(claim_id)
+    if not state:
+        raise HTTPException(404, "Claim not found")
+
+    state.has_pending_dispute = False
+    _claim_states[claim_id] = state
+    await save_claim_state(state.model_dump())
+
+    try:
+        get_supabase().table("claims").update({
+            "has_pending_dispute": False,
+        }).eq("id", claim_id).execute()
+    except Exception as e:
+        print(f"[disputes] DB update error: {e}")
+
+    await log_audit_event(
+        claim_id, state.org_id, actor.id, actor.name, actor.role,
+        "resolve_dispute",
+        request.resolution_note or "Dispute resolved",
+    )
+
+    return {"resolved": True}

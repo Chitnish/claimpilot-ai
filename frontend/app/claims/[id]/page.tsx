@@ -14,6 +14,7 @@ import {
   Info,
   Link2,
   Loader2,
+  MessageSquareWarning,
   PauseCircle,
   Receipt,
   RefreshCw,
@@ -34,7 +35,7 @@ import {
   statusBadgeVariant,
   truncateId,
 } from "@/lib/claim-ui";
-import { agentEventSchema, type Claim, type TimelineEvent } from "@/lib/schemas";
+import { agentEventSchema, type Claim, type DisputeMessage, type TimelineEvent } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,6 +50,33 @@ import { cn } from "@/lib/utils";
 import { PipelineDiagram } from "@/components/pipeline-diagram";
 import { ReviewCopilot } from "@/components/review-copilot";
 import { CorrectClaimPanel } from "@/components/correct-claim-panel";
+
+function formatDisputeTimestamp(value: string): string {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function disputeSenderLabel(sender: string): string {
+  if (sender === "payer_reply") {
+    return "Reply to Appeal";
+  }
+  if (sender === "ai_reply") {
+    return "AI Reply";
+  }
+  return sender;
+}
 
 export default function ClaimDetailPage(): React.ReactElement {
   const params = useParams<{ id: string }>();
@@ -736,6 +764,58 @@ export default function ClaimDetailPage(): React.ReactElement {
                   </div>
                 </CardContent>
               )}
+            </Card>
+          )}
+
+          {claim.disputeThread.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Dispute Thread</CardTitle>
+                <CardDescription>
+                  Appeal email replies and AI responses
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {claim.hasPendingDispute && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    <MessageSquareWarning className="mt-0.5 size-4 shrink-0" />
+                    <p>
+                      This dispute has been flagged for human review.{" "}
+                      <Link
+                        href="/disputes"
+                        className="font-medium underline underline-offset-2"
+                      >
+                        View pending disputes
+                      </Link>
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {claim.disputeThread.map((msg: DisputeMessage, index: number) => (
+                    <div
+                      key={`${msg.sender}-${index}`}
+                      className={cn(
+                        "max-w-[92%] rounded-lg p-3 text-sm",
+                        msg.sender === "ai_reply"
+                          ? "ml-auto bg-[#1e3a5f]/10"
+                          : "mr-auto bg-muted",
+                      )}
+                    >
+                      <p className="mb-1 text-xs font-medium text-muted-foreground">
+                        {disputeSenderLabel(msg.sender)}
+                        {msg.createdAt && (
+                          <span className="ml-2 font-normal">
+                            {formatDisputeTimestamp(msg.createdAt)}
+                          </span>
+                        )}
+                      </p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-foreground">
+                        {msg.messageText}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
             </Card>
           )}
 
