@@ -1567,6 +1567,7 @@ async def _process_dispute_inbound(claim_id: str, inbound_email_id: str | None) 
     from app.services.dispute_handler import (
         detect_escalation_request,
         generate_dispute_reply,
+        generate_escalation_acknowledgment,
         last_ai_message_asked_to_escalate,
     )
     from app.services.resend_client import fetch_inbound_email_body, send_dispute_reply_email
@@ -1593,6 +1594,11 @@ async def _process_dispute_inbound(claim_id: str, inbound_email_id: str | None) 
                 f"preview: {text_body[:200]!r}"
             )
 
+        escalation_this_turn = (
+            detect_escalation_request(text_body)
+            and last_ai_message_asked_to_escalate(state.dispute_thread)
+        )
+
         await save_dispute_message(
             claim_id, state.org_id, "payer_reply", text_body, inbound_email_id,
         )
@@ -1605,7 +1611,13 @@ async def _process_dispute_inbound(claim_id: str, inbound_email_id: str | None) 
             payer_entry["resend_email_id"] = inbound_email_id
         state.dispute_thread.append(payer_entry)
 
-        ai_reply = await generate_dispute_reply(state, state.dispute_thread, text_body)
+        if escalation_this_turn:
+            state.has_pending_dispute = True
+            ai_reply = generate_escalation_acknowledgment(state)
+        else:
+            ai_reply = await generate_dispute_reply(
+                state, state.dispute_thread, text_body,
+            )
 
         await save_dispute_message(claim_id, state.org_id, "ai_reply", ai_reply)
         state.dispute_thread.append({
@@ -1613,12 +1625,6 @@ async def _process_dispute_inbound(claim_id: str, inbound_email_id: str | None) 
             "message_text": ai_reply,
             "created_at": datetime.utcnow().isoformat(),
         })
-
-        if (
-            detect_escalation_request(text_body)
-            and last_ai_message_asked_to_escalate(state.dispute_thread[:-1])
-        ):
-            state.has_pending_dispute = True
 
         _claim_states[claim_id] = state
         await save_claim_state(state.model_dump())

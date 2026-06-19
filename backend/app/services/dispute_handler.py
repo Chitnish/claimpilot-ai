@@ -104,6 +104,15 @@ Draft your professional email reply to the latest message.
     return strip_markdown(reply or "")
 
 
+def generate_escalation_acknowledgment(claim_state: ClaimState) -> str:
+    return (
+        f"Thank you. This dispute regarding claim "
+        f"{claim_state.claim_id[:8].upper()} has been flagged for human "
+        f"reviewer handling by our team. They will follow up with next "
+        f"steps."
+    )
+
+
 def detect_escalation_request(reply_text: str) -> bool:
     """Conservative keyword check for affirmative escalation intent."""
     text = reply_text.lower()
