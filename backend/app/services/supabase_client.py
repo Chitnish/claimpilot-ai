@@ -101,6 +101,18 @@ def save_claim_state_sync(state_dict: dict) -> None:
     if not claim_id:
         return
     try:
+        existing = load_claim_state(claim_id)
+        if existing:
+            ex_thread = existing.get("dispute_thread") or []
+            new_thread = state_dict.get("dispute_thread") or []
+            # Render webhook writes disputes to Storage; local in-memory saves must
+            # not overwrite a longer thread with stale empty data.
+            if len(ex_thread) > len(new_thread):
+                state_dict = {
+                    **state_dict,
+                    "dispute_thread": ex_thread,
+                    "has_pending_dispute": bool(existing.get("has_pending_dispute")),
+                }
         payload = json.dumps(state_dict, default=str).encode("utf-8")
         get_supabase().storage.from_(_STATE_BUCKET).upload(
             _state_path(claim_id),

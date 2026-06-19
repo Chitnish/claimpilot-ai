@@ -767,58 +767,6 @@ export default function ClaimDetailPage(): React.ReactElement {
             </Card>
           )}
 
-          {claim.disputeThread.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Dispute Thread</CardTitle>
-                <CardDescription>
-                  Appeal email replies and AI responses
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {claim.hasPendingDispute && (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                    <MessageSquareWarning className="mt-0.5 size-4 shrink-0" />
-                    <p>
-                      This dispute has been flagged for human review.{" "}
-                      <Link
-                        href="/disputes"
-                        className="font-medium underline underline-offset-2"
-                      >
-                        View pending disputes
-                      </Link>
-                    </p>
-                  </div>
-                )}
-                <div className="space-y-3">
-                  {claim.disputeThread.map((msg: DisputeMessage, index: number) => (
-                    <div
-                      key={`${msg.sender}-${index}`}
-                      className={cn(
-                        "max-w-[92%] rounded-lg p-3 text-sm",
-                        msg.sender === "ai_reply"
-                          ? "ml-auto bg-[#1e3a5f]/10"
-                          : "mr-auto bg-muted",
-                      )}
-                    >
-                      <p className="mb-1 text-xs font-medium text-muted-foreground">
-                        {disputeSenderLabel(msg.sender)}
-                        {msg.createdAt && (
-                          <span className="ml-2 font-normal">
-                            {formatDisputeTimestamp(msg.createdAt)}
-                          </span>
-                        )}
-                      </p>
-                      <p className="whitespace-pre-wrap leading-relaxed text-foreground">
-                        {msg.messageText}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {isDenied && !claim.correctedByClaimId && (
             <CorrectClaimPanel claim={claim} />
           )}
@@ -1100,6 +1048,60 @@ export default function ClaimDetailPage(): React.ReactElement {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {claim.disputeThread.length > 0 && (
+        <section className="mt-8">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-[#1e3a5f]">Dispute Log</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Email exchange following the appeal letter
+            </p>
+          </div>
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              {claim.hasPendingDispute && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <MessageSquareWarning className="mt-0.5 size-4 shrink-0" />
+                  <p>
+                    This dispute has been flagged for human review.{" "}
+                    <Link
+                      href="/disputes"
+                      className="font-medium underline underline-offset-2"
+                    >
+                      View pending disputes
+                    </Link>
+                  </p>
+                </div>
+              )}
+              <div className="space-y-4">
+                {claim.disputeThread.map((msg: DisputeMessage, index: number) => (
+                  <div
+                    key={`${msg.sender}-${index}`}
+                    className={cn(
+                      "max-w-[70%] rounded-lg p-4 text-sm",
+                      msg.sender === "ai_reply"
+                        ? "ml-auto bg-[#1e3a5f]/10"
+                        : "mr-auto bg-muted",
+                    )}
+                  >
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                      {disputeSenderLabel(msg.sender)}
+                      {msg.createdAt && (
+                        <span className="ml-2 font-normal">
+                          {formatDisputeTimestamp(msg.createdAt)}
+                        </span>
+                      )}
+                    </p>
+                    <p className="whitespace-pre-wrap leading-relaxed text-foreground">
+                      {msg.messageText}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
       )}
     </div>
   );

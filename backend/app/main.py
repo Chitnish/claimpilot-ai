@@ -186,6 +186,18 @@ def _get_state(claim_id: str) -> ClaimState | None:
     return state
 
 
+def _apply_storage_dispute_fields(state: ClaimState) -> ClaimState:
+    """Merge dispute_thread / has_pending_dispute from Storage (Render webhook writes there)."""
+    snapshot = load_claim_state(state.claim_id)
+    if not snapshot:
+        return state
+    if "dispute_thread" in snapshot:
+        state.dispute_thread = snapshot.get("dispute_thread") or []
+    if "has_pending_dispute" in snapshot:
+        state.has_pending_dispute = bool(snapshot.get("has_pending_dispute"))
+    return state
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Verify DB connection on startup
@@ -797,7 +809,15 @@ async def get_claim(claim_id: str):
             return row.data
         except Exception:
             raise HTTPException(404, "Claim not found")
-    return state.model_dump()
+    state = _apply_storage_dispute_fields(state)
+    _claim_states[claim_id] = state
+    dump = state.model_dump()
+    thread = dump.get("dispute_thread") or []
+    print(
+        f"[get_claim] {claim_id[:8]} dispute_thread messages={len(thread)} "
+        f"has_pending_dispute={dump.get('has_pending_dispute')}"
+    )
+    return dump
 
 
 @app.post("/claims/{claim_id}/send-appeal")
@@ -1538,7 +1558,7 @@ async def resend_inbound_webhook(request: Request):
         generate_dispute_reply,
         last_ai_message_asked_to_escalate,
     )
-    from app.services.resend_client import send_dispute_reply_email
+    from app.services.resend_client import fetch_inbound_email_body, send_dispute_reply_email
 
     payload = await request.json()
     if payload.get("type") != "email.received":
@@ -1547,6 +1567,24 @@ async def resend_inbound_webhook(request: Request):
     data = payload.get("data", {})
     subject = data.get("subject", "")
     text_body = data.get("text", "") or data.get("html", "")
+    print(f"[dispute] inbound payload keys: {list(data.keys())}")
+    print(
+        f"[dispute] webhook text_body length: {len(text_body)}, "
+        f"content: {text_body[:200]!r}"
+    )
+
+    email_id = data.get("email_id")
+    inbound_message_id: str | None = data.get("message_id")
+    if email_id:
+        fetched_body, fetched_mid = await fetch_inbound_email_body(email_id)
+        print(
+            f"[dispute] Receiving API body length: {len(fetched_body)}, "
+            f"preview: {fetched_body[:200]!r}"
+        )
+        if fetched_body:
+            text_body = fetched_body
+        if fetched_mid:
+            inbound_message_id = fetched_mid
 
     claim_id = _extract_claim_id_from_subject(subject)
     if not claim_id:
@@ -1591,7 +1629,7 @@ async def resend_inbound_webhook(request: Request):
         print(f"[dispute] DB update error: {e}")
 
     await send_dispute_reply_email(
-        claim_id, state, ai_reply, in_reply_to=data.get("message_id"),
+        claim_id, state, ai_reply, in_reply_to=inbound_message_id,
     )
 
     await log_agent_event(
@@ -1616,6 +1654,7 @@ async def list_pending_disputes():
             item = dict(row)
             state = _get_state(claim_id)
             if state:
+                state = _apply_storage_dispute_fields(state)
                 item["patient_name"] = state.patient_name
                 item["dispute_thread"] = state.dispute_thread
                 if not item.get("carc_code"):

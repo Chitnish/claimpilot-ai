@@ -3,10 +3,72 @@ from __future__ import annotations
 import asyncio
 import html
 import os
+import re
 
 import resend
 
 resend.api_key = os.getenv("RESEND_API_KEY", "")
+
+
+def _strip_html_to_text(raw: str) -> str:
+    """Basic HTML → plain text for inbound emails that only have an html body."""
+    text = re.sub(r"<br\s*/?>", "\n", raw, flags=re.I)
+    text = re.sub(r"</p>", "\n\n", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html.unescape(text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def trim_quoted_reply(text: str) -> str:
+    """Keep only the new reply text; drop Gmail/Outlook quoted thread below."""
+    if not text:
+        return ""
+    cut = text
+    for pattern in (
+        r"\nOn .+ wrote:\s*\n",
+        r"\n-{3,}\s*Original Message",
+        r"\n_{3,}",
+        r"\nFrom:.+\nSent:",
+    ):
+        m = re.search(pattern, cut, flags=re.I)
+        if m:
+            cut = cut[:m.start()]
+    lines = cut.splitlines()
+    trimmed: list[str] = []
+    for line in lines:
+        if line.strip().startswith(">") and trimmed:
+            break
+        trimmed.append(line)
+    return "\n".join(trimmed).strip()
+
+
+def extract_inbound_body(email: dict) -> str:
+    """Plain-text body from a Receiving API response, with quote trimming."""
+    text = (email.get("text") or "").strip()
+    html_raw = (email.get("html") or "").strip()
+    if text:
+        body = text
+    elif html_raw:
+        body = _strip_html_to_text(html_raw)
+    else:
+        body = ""
+    return trim_quoted_reply(body)
+
+
+async def fetch_inbound_email_body(email_id: str) -> tuple[str, str | None]:
+    """Resend webhooks omit the body — must call Emails.Receiving.get(email_id)."""
+    def _fetch() -> tuple[str, str | None]:
+        received = resend.Emails.Receiving.get(email_id)
+        data = received if isinstance(received, dict) else dict(received)
+        body = extract_inbound_body(data)
+        message_id = data.get("message_id") or None
+        return body, message_id
+
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception as exc:
+        print(f"[dispute] Receiving API error for {email_id}: {exc}")
+        return "", None
 
 
 def _appeal_subject(claim_id: str, patient_name: str) -> str:
