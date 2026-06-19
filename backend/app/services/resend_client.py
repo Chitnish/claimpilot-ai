@@ -195,6 +195,7 @@ async def send_dispute_reply_email(
     patient_name = getattr(state, "patient_name", "") or "Patient"
     subject = f"Re: {_appeal_subject(claim_id, patient_name)}"
     html_body = _reply_html(reply_text)
+    reply_to = os.getenv("RESEND_INBOUND_ADDRESS", "")
 
     payload: dict = {
         "from": from_email,
@@ -202,6 +203,8 @@ async def send_dispute_reply_email(
         "subject": subject,
         "html": html_body,
     }
+    if reply_to:
+        payload["reply_to"] = [reply_to]
     if in_reply_to:
         payload["headers"] = {
             "In-Reply-To": in_reply_to,

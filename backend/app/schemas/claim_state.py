@@ -136,7 +136,7 @@ class ClaimState(BaseModel):
     # Dispute / appeal email thread
     has_pending_dispute: bool = False
     dispute_thread: list[dict] = Field(default_factory=list)
-    # each dict: {sender, message_text, created_at}
+    # each dict: {sender, message_text, created_at, resend_email_id?}
 
     # Trace log (drives live feed)
     agent_events: list[AgentEvent] = Field(default_factory=list)

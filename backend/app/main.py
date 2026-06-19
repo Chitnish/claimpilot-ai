@@ -36,6 +36,8 @@ _claim_states: dict[str, ClaimState] = {}
 # each gets its own queue and every event fans out to all of them.
 _claim_subscribers: dict[str, set[asyncio.Queue]] = {}
 _state_events_pushed: dict[str, int] = {}  # count of state.agent_events already streamed
+# Inbound Resend email_ids accepted this process lifetime (retry + parallel webhook guard).
+_dispute_inbound_processing: set[str] = set()
 
 
 async def push_event(claim_id: str, event: dict) -> None:
@@ -1537,7 +1539,8 @@ async def claim_chat(
 def _extract_claim_id_from_subject(subject: str) -> str | None:
     """Parse 8-char claim id prefix from appeal email subject and resolve full UUID."""
     import re
-    match = re.search(r"Claim ([a-f0-9]{8})", subject, re.IGNORECASE)
+    # Match anywhere in subject — survives Re:/Fwd: prefixes and truncation elsewhere.
+    match = re.search(r"Claim\s+([a-f0-9]{8})", subject, re.IGNORECASE)
     if not match:
         return None
     prefix = match.group(1).lower()
@@ -1551,8 +1554,16 @@ def _extract_claim_id_from_subject(subject: str) -> str | None:
     return None
 
 
-@app.post("/webhooks/resend-inbound")
-async def resend_inbound_webhook(request: Request):
+def _payer_reply_exists_for_email(state: ClaimState, email_id: str) -> bool:
+    return any(
+        msg.get("resend_email_id") == email_id
+        for msg in state.dispute_thread
+        if msg.get("sender") == "payer_reply"
+    )
+
+
+async def _process_dispute_inbound(claim_id: str, inbound_email_id: str | None) -> None:
+    """Heavy path: fetch body, AI reply, persist, send — runs after webhook ack."""
     from app.services.dispute_handler import (
         detect_escalation_request,
         generate_dispute_reply,
@@ -1560,31 +1571,100 @@ async def resend_inbound_webhook(request: Request):
     )
     from app.services.resend_client import fetch_inbound_email_body, send_dispute_reply_email
 
+    try:
+        state = _get_state(claim_id)
+        if not state:
+            print(f"[dispute] background: claim not found {claim_id}")
+            return
+        state = _apply_storage_dispute_fields(state)
+
+        if inbound_email_id and _payer_reply_exists_for_email(state, inbound_email_id):
+            print(
+                f"[dispute] background duplicate for email_id={inbound_email_id}, skipping"
+            )
+            return
+
+        text_body = ""
+        inbound_message_id: str | None = None
+        if inbound_email_id:
+            text_body, inbound_message_id = await fetch_inbound_email_body(inbound_email_id)
+            print(
+                f"[dispute] Receiving API body length: {len(text_body)}, "
+                f"preview: {text_body[:200]!r}"
+            )
+
+        await save_dispute_message(
+            claim_id, state.org_id, "payer_reply", text_body, inbound_email_id,
+        )
+        payer_entry: dict = {
+            "sender": "payer_reply",
+            "message_text": text_body,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        if inbound_email_id:
+            payer_entry["resend_email_id"] = inbound_email_id
+        state.dispute_thread.append(payer_entry)
+
+        ai_reply = await generate_dispute_reply(state, state.dispute_thread, text_body)
+
+        await save_dispute_message(claim_id, state.org_id, "ai_reply", ai_reply)
+        state.dispute_thread.append({
+            "sender": "ai_reply",
+            "message_text": ai_reply,
+            "created_at": datetime.utcnow().isoformat(),
+        })
+
+        if (
+            detect_escalation_request(text_body)
+            and last_ai_message_asked_to_escalate(state.dispute_thread[:-1])
+        ):
+            state.has_pending_dispute = True
+
+        _claim_states[claim_id] = state
+        await save_claim_state(state.model_dump())
+
+        try:
+            get_supabase().table("claims").update({
+                "has_pending_dispute": state.has_pending_dispute,
+            }).eq("id", claim_id).execute()
+        except Exception as e:
+            print(f"[dispute] DB update error: {e}")
+
+        await send_dispute_reply_email(
+            claim_id, state, ai_reply, in_reply_to=inbound_message_id,
+        )
+
+        await log_agent_event(
+            claim_id, state.org_id, "dispute", "completed",
+            f"Received payer reply, AI responded. Escalation requested: "
+            f"{state.has_pending_dispute}",
+            {}, 0,
+        )
+        print(f"[dispute] background complete for {claim_id[:8]}")
+    except Exception as exc:
+        print(f"[dispute] background error for {claim_id[:8]}: {exc}")
+        import traceback
+        traceback.print_exc()
+        if inbound_email_id:
+            _dispute_inbound_processing.discard(inbound_email_id)
+
+
+@app.post("/webhooks/resend-inbound")
+async def resend_inbound_webhook(request: Request):
     payload = await request.json()
     if payload.get("type") != "email.received":
         return {"ignored": True}
 
     data = payload.get("data", {})
     subject = data.get("subject", "")
-    text_body = data.get("text", "") or data.get("html", "")
-    print(f"[dispute] inbound payload keys: {list(data.keys())}")
-    print(
-        f"[dispute] webhook text_body length: {len(text_body)}, "
-        f"content: {text_body[:200]!r}"
-    )
+    inbound_email_id = data.get("email_id")
 
-    email_id = data.get("email_id")
-    inbound_message_id: str | None = data.get("message_id")
-    if email_id:
-        fetched_body, fetched_mid = await fetch_inbound_email_body(email_id)
-        print(
-            f"[dispute] Receiving API body length: {len(fetched_body)}, "
-            f"preview: {fetched_body[:200]!r}"
-        )
-        if fetched_body:
-            text_body = fetched_body
-        if fetched_mid:
-            inbound_message_id = fetched_mid
+    print(f"[dispute] inbound payload keys: {list(data.keys())}")
+    print(f"[dispute] raw subject received: {subject}")
+    print(
+        f"[dispute] inbound to={data.get('to')}, from={data.get('from')}, "
+        f"email_id={inbound_email_id}"
+    )
 
     claim_id = _extract_claim_id_from_subject(subject)
     if not claim_id:
@@ -1596,50 +1676,20 @@ async def resend_inbound_webhook(request: Request):
         print(f"[dispute] claim not found: {claim_id}")
         return {"error": "claim not found"}
 
-    await save_dispute_message(claim_id, state.org_id, "payer_reply", text_body)
-    state.dispute_thread.append({
-        "sender": "payer_reply",
-        "message_text": text_body,
-        "created_at": datetime.utcnow().isoformat(),
-    })
+    state = _apply_storage_dispute_fields(state)
 
-    ai_reply = await generate_dispute_reply(state, state.dispute_thread, text_body)
-
-    await save_dispute_message(claim_id, state.org_id, "ai_reply", ai_reply)
-    state.dispute_thread.append({
-        "sender": "ai_reply",
-        "message_text": ai_reply,
-        "created_at": datetime.utcnow().isoformat(),
-    })
-
-    if (
-        detect_escalation_request(text_body)
-        and last_ai_message_asked_to_escalate(state.dispute_thread[:-1])
+    if inbound_email_id and (
+        inbound_email_id in _dispute_inbound_processing
+        or _payer_reply_exists_for_email(state, inbound_email_id)
     ):
-        state.has_pending_dispute = True
+        print(f"[dispute] Duplicate webhook for email_id={inbound_email_id}, skipping")
+        return {"ignored": True, "reason": "duplicate"}
 
-    _claim_states[claim_id] = state
-    await save_claim_state(state.model_dump())
+    if inbound_email_id:
+        _dispute_inbound_processing.add(inbound_email_id)
 
-    try:
-        get_supabase().table("claims").update({
-            "has_pending_dispute": state.has_pending_dispute,
-        }).eq("id", claim_id).execute()
-    except Exception as e:
-        print(f"[dispute] DB update error: {e}")
-
-    await send_dispute_reply_email(
-        claim_id, state, ai_reply, in_reply_to=inbound_message_id,
-    )
-
-    await log_agent_event(
-        claim_id, state.org_id, "dispute", "completed",
-        f"Received payer reply, AI responded. Escalation requested: "
-        f"{state.has_pending_dispute}",
-        {}, 0,
-    )
-
-    return {"processed": True, "claim_id": claim_id}
+    asyncio.create_task(_process_dispute_inbound(claim_id, inbound_email_id))
+    return {"processing": True, "claim_id": claim_id}
 
 
 @app.get("/disputes/pending")
