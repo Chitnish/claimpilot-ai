@@ -1204,10 +1204,14 @@ async def resume_claim(
 
         if "variance" in reason_lower:
             # Payment already received — approving accepts the posted payment.
-            from app.agents.reconciliation import finalize_patient_ar
+            from app.agents.reconciliation import finalize_patient_ar, maybe_send_patient_statement_email
             state.recon_discrepancy = False
             state.status = ClaimStatus.RECONCILED
             ar_note = await asyncio.to_thread(finalize_patient_ar, state)
+            events_before = len(state.agent_events)
+            await maybe_send_patient_statement_email(state)
+            for evt in state.agent_events[events_before:]:
+                await push_event(claim_id, evt.model_dump())
             _claim_states[claim_id] = state
             await asyncio.to_thread(_persist_claim_row, state)
             await asyncio.to_thread(_persist_ar_fields, state)

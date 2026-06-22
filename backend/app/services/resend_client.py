@@ -178,6 +178,101 @@ async def send_appeal_email(
     return True
 
 
+def _patient_statement_html(patient_name: str, claim_id: str, patient_balance: float) -> str:
+    short_id = claim_id[:8].upper()
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;background:#f5f5f5;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;">
+    <div style="background:#1e3a5f;color:#ffffff;padding:20px 24px;border-radius:8px 8px 0 0;">
+      <h1 style="margin:0;font-size:20px;font-weight:600;">ClaimPilot AI</h1>
+      <p style="color:#a0b4c8;margin:4px 0 0 0;font-size:14px;">Patient Billing Statement</p>
+    </div>
+    <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-radius:0 0 8px 8px;">
+      <p style="color:#374151;font-size:15px;">Dear {html.escape(patient_name)},</p>
+      <p style="color:#374151;font-size:14px;line-height:1.6;">
+        Please find attached your patient billing statement for Claim
+        <strong>{html.escape(short_id)}</strong>.
+      </p>
+      <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin:16px 0;">
+        <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">Amount Due</p>
+        <p style="margin:0;font-size:28px;font-weight:bold;color:#1e3a5f;">
+          ${patient_balance:,.2f}
+        </p>
+      </div>
+      <p style="color:#374151;font-size:14px;line-height:1.6;">
+        This statement reflects the portion of your healthcare services
+        not covered by your insurance. Please review the attached PDF
+        for a complete itemized breakdown of services.
+      </p>
+      <p style="color:#6b7280;font-size:12px;margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">
+        This is an automated statement from ClaimPilot AI.
+        For questions, please contact your provider's billing office.
+      </p>
+    </div>
+    <div style="padding:12px 24px;font-size:12px;color:#888888;border-top:1px solid #e0e0e0;">
+      Synthetic demo — not a real claim.
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+async def send_patient_statement_email(
+    claim_id: str,
+    patient_name: str,
+    total_charge: float,
+    patient_balance: float,
+    statement_pdf_path: str,
+) -> bool:
+    """Send the patient statement PDF as an email attachment."""
+    import base64
+    from pathlib import Path
+
+    from_email = os.getenv("ALERT_FROM_EMAIL", "onboarding@resend.dev")
+    to_email = os.getenv("ALERT_TO_EMAIL", "")
+
+    if not to_email:
+        print("Warning: ALERT_TO_EMAIL is not set; skipping patient statement email.")
+        return False
+
+    pdf_path = Path(statement_pdf_path)
+    if not pdf_path.exists():
+        print(f"[resend] patient statement PDF not found: {statement_pdf_path}")
+        return False
+
+    pdf_b64 = base64.b64encode(pdf_path.read_bytes()).decode("utf-8")
+    short_id = claim_id[:8].upper()
+    subject = f"Patient Statement — {patient_name} — Claim {short_id}"
+    html_body = _patient_statement_html(patient_name, claim_id, patient_balance)
+
+    payload: dict = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": subject,
+        "html": html_body,
+        "attachments": [
+            {
+                "filename": f"patient_statement_{claim_id[:8]}.pdf",
+                "content": pdf_b64,
+            }
+        ],
+    }
+
+    def _send() -> None:
+        resend.Emails.send(payload)
+
+    try:
+        await asyncio.to_thread(_send)
+    except Exception as exc:
+        print(f"[resend] patient statement email error: {exc}")
+        return False
+
+    print(f"[resend] patient statement email sent for claim {claim_id[:8]}")
+    return True
+
+
 async def send_dispute_reply_email(
     claim_id: str,
     state,

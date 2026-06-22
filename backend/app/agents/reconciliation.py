@@ -52,6 +52,44 @@ def finalize_patient_ar(state: ClaimState) -> str:
     )
 
 
+async def maybe_send_patient_statement_email(state: ClaimState) -> None:
+    """Email the statement PDF once when the patient owes a balance."""
+    if (
+        not state.cms1500_path
+        or state.patient_responsibility <= 0
+        or state.statement_email_sent
+        or not state.patient_statement_path
+    ):
+        return
+
+    from app.services.resend_client import send_patient_statement_email
+
+    email_sent = await send_patient_statement_email(
+        claim_id=state.claim_id,
+        patient_name=state.patient_name,
+        total_charge=state.total_charge,
+        patient_balance=state.patient_responsibility,
+        statement_pdf_path=state.patient_statement_path,
+    )
+    if not email_sent:
+        return
+
+    state.statement_email_sent = True
+    summary = (
+        f"Patient statement emailed to billing contact. "
+        f"Balance due: ${state.patient_responsibility:.2f}"
+    )
+    state.agent_events.append(AgentEvent(
+        agent="reconciliation",
+        event="completed",
+        summary=summary,
+    ))
+    await log_agent_event(
+        state.claim_id, state.org_id, "reconciliation", "completed",
+        summary, {"patient_balance": state.patient_responsibility}, 0,
+    )
+
+
 async def run(state: ClaimState) -> ClaimState:
     t0 = time.monotonic()
 
@@ -125,6 +163,7 @@ async def run(state: ClaimState) -> ClaimState:
     else:
         state.status = ClaimStatus.RECONCILED
         pr_note = finalize_patient_ar(state)
+        await maybe_send_patient_statement_email(state)
         if state.amount_paid == 0 and state.patient_responsibility > 0:
             summary = (
                 f"Reconciliation complete. Payer paid $0.00 (check {era['check_number']}) — "
