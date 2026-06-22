@@ -14,6 +14,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.schemas.claim_state import AgentEvent, ClaimLine, ClaimState, ClaimStatus
+from app.schemas.patient import (
+    PatientAppointmentCreate,
+    PatientDocumentCreate,
+    PatientProfileUpdate,
+)
+from app.services.patient_profiles import (
+    create_appointment,
+    create_document,
+    delete_appointment,
+    delete_document,
+    document_download_url,
+    get_patient_detail,
+    list_appointments,
+    list_documents,
+    list_patients,
+    update_patient_profile,
+    upload_patient_document,
+    upsert_patient_from_claim,
+)
 from app.graph.pipeline import pipeline
 from app.services.corrections import build_corrected_claim
 from app.services.security import Actor, get_actor, can_approve, DEMO_USERS
@@ -384,6 +403,7 @@ async def _stream_pipeline(claim_id: str, state: ClaimState, thread_id: str) -> 
         # Persistence is blocking HTTP — keep it off the event loop.
         await asyncio.to_thread(_persist_claim_row, final_state)
         await asyncio.to_thread(_persist_ar_fields, final_state)
+        await asyncio.to_thread(upsert_patient_from_claim, final_state)
         await save_claim_state(final_state.model_dump())
         # SSE generators detect paused/terminal state themselves.
 
@@ -984,6 +1004,118 @@ async def ar_aging():
         "buckets": [bucket_totals[b["label"]] for b in buckets],
         "accounts": accounts[:200],
     }
+
+
+@app.get("/patients")
+async def patients_list(q: str = "", limit: int = 20, offset: int = 0):
+    """Paginated patient directory with claim aggregates."""
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    try:
+        return list_patients(q=q, limit=limit, offset=offset)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/patients/{patient_id}")
+async def patient_detail(patient_id: str):
+    """Full patient profile with claims, appointments, documents, and stats."""
+    try:
+        detail = get_patient_detail(patient_id)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    if not detail:
+        raise HTTPException(404, "Patient not found")
+    return detail
+
+
+@app.put("/patients/{patient_id}")
+async def patient_update(patient_id: str, body: PatientProfileUpdate):
+    try:
+        updated = update_patient_profile(patient_id, body)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    if not updated:
+        raise HTTPException(404, "Patient not found")
+    return {"patient": updated}
+
+
+@app.get("/patients/{patient_id}/appointments")
+async def patient_appointments_list(patient_id: str):
+    return list_appointments(patient_id)
+
+
+@app.post("/patients/{patient_id}/appointments")
+async def patient_appointment_create(patient_id: str, body: PatientAppointmentCreate):
+    detail = get_patient_detail(patient_id)
+    if not detail:
+        raise HTTPException(404, "Patient not found")
+    org_id = detail["patient"].get("org_id") or ""
+    row = create_appointment(patient_id, org_id, body.model_dump())
+    if not row:
+        raise HTTPException(500, "Failed to create appointment")
+    return row
+
+
+@app.delete("/patients/{patient_id}/appointments/{appointment_id}")
+async def patient_appointment_delete(patient_id: str, appointment_id: str):
+    if not delete_appointment(patient_id, appointment_id):
+        raise HTTPException(500, "Failed to delete appointment")
+    return {"deleted": True}
+
+
+@app.get("/patients/{patient_id}/documents")
+async def patient_documents_list(patient_id: str):
+    docs = list_documents(patient_id)
+    for doc in docs:
+        path = doc.get("storage_path")
+        if path:
+            doc["download_url"] = document_download_url(path)
+    return docs
+
+
+@app.post("/patients/{patient_id}/documents")
+async def patient_document_create(patient_id: str, body: PatientDocumentCreate):
+    detail = get_patient_detail(patient_id)
+    if not detail:
+        raise HTTPException(404, "Patient not found")
+    org_id = detail["patient"].get("org_id") or ""
+    row = create_document(patient_id, org_id, body.model_dump())
+    if not row:
+        raise HTTPException(500, "Failed to save document metadata")
+    if row.get("storage_path"):
+        row["download_url"] = document_download_url(row["storage_path"])
+    return row
+
+
+@app.post("/patients/{patient_id}/documents/upload")
+async def patient_document_upload(
+    patient_id: str,
+    file: UploadFile = File(...),
+    document_type: str = "other",
+    notes: str = "",
+):
+    detail = get_patient_detail(patient_id)
+    if not detail:
+        raise HTTPException(404, "Patient not found")
+    org_id = detail["patient"].get("org_id") or ""
+    content = await file.read()
+    row = upload_patient_document(
+        patient_id, org_id, file.filename or "document.pdf", content,
+        document_type, notes,
+    )
+    if not row:
+        raise HTTPException(500, "Failed to upload document")
+    if row.get("storage_path"):
+        row["download_url"] = document_download_url(row["storage_path"])
+    return row
+
+
+@app.delete("/patients/{patient_id}/documents/{document_id}")
+async def patient_document_delete(patient_id: str, document_id: str):
+    if not delete_document(patient_id, document_id):
+        raise HTTPException(500, "Failed to delete document")
+    return {"deleted": True}
 
 
 def _in_memory_review_items() -> list[dict]:

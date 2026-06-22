@@ -14,6 +14,9 @@ import {
   batchUploadResponseSchema,
   disputeQueueSchema,
   resolveDisputeResponseSchema,
+  patientListResponseSchema,
+  patientDetailSchema,
+  patientRecordSchema,
   type AgentEvent,
   type BatchUploadResponse,
   type Analytics,
@@ -28,6 +31,9 @@ import {
   type ReviewItem,
   type DisputeItem,
   type UploadResponse,
+  type PatientListResponse,
+  type PatientDetail,
+  type PatientRecord,
 } from "@/lib/schemas";
 
 import { actorHeaders, getActor } from "@/lib/actor";
@@ -367,4 +373,130 @@ export function subscribeToClaimEvents(
   return () => {
     source.close();
   };
+}
+
+export interface PatientSearchParams {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function listPatients(
+  params: PatientSearchParams = {},
+): Promise<PatientListResponse> {
+  const query = new URLSearchParams();
+  if (params.q) query.set("q", params.q);
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+
+  const response = await fetch(`${API_BASE}/patients?${query.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load patients (${response.status})`);
+  }
+  return parseJson(response, patientListResponseSchema);
+}
+
+export async function getPatient(patientId: string): Promise<PatientDetail> {
+  const response = await fetch(`${API_BASE}/patients/${patientId}`);
+  if (!response.ok) {
+    throw new Error(`Patient not found (${response.status})`);
+  }
+  return parseJson(response, patientDetailSchema);
+}
+
+export async function updatePatient(
+  patientId: string,
+  fields: Partial<Record<keyof PatientRecord, string | number>>,
+): Promise<PatientRecord> {
+  const snakeBody: Record<string, string | number> = {};
+  const mapping: Record<string, string> = {
+    firstName: "first_name",
+    lastName: "last_name",
+    middleName: "middle_name",
+    preferredName: "preferred_name",
+    gender: "gender",
+    dob: "dob",
+    ssnLast4: "ssn_last4",
+    memberId: "member_id",
+    payerName: "payer_name",
+    addressLine1: "address_line1",
+    addressLine2: "address_line2",
+    city: "city",
+    state: "state",
+    zipCode: "zip_code",
+    phonePrimary: "phone_primary",
+    phoneSecondary: "phone_secondary",
+    email: "email",
+    emergencyContactName: "emergency_contact_name",
+    emergencyContactRelationship: "emergency_contact_relationship",
+    emergencyContactPhone: "emergency_contact_phone",
+    responsiblePartyName: "responsible_party_name",
+    responsiblePartyRelationship: "responsible_party_relationship",
+    responsiblePartyDob: "responsible_party_dob",
+    responsiblePartyPhone: "responsible_party_phone",
+    insurancePlanName: "insurance_plan_name",
+    insuranceGroupNumber: "insurance_group_number",
+    insurancePlanType: "insurance_plan_type",
+    insuranceEffectiveDate: "insurance_effective_date",
+    insuranceCopay: "insurance_copay",
+    insuranceDeductible: "insurance_deductible",
+    secondaryPayerName: "secondary_payer_name",
+    secondaryMemberId: "secondary_member_id",
+    notes: "notes",
+  };
+  for (const [key, val] of Object.entries(fields)) {
+    const snake = mapping[key];
+    if (snake && val !== undefined) snakeBody[snake] = val;
+  }
+
+  const response = await fetch(`${API_BASE}/patients/${patientId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
+    body: JSON.stringify(snakeBody),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, `Failed to update patient (${response.status})`));
+  }
+  const data = await response.json() as { patient: unknown };
+  return patientRecordSchema.parse(data.patient);
+}
+
+export async function createPatientAppointment(
+  patientId: string,
+  body: {
+    appointment_date: string;
+    appointment_time?: string;
+    provider_name?: string;
+    appointment_type?: string;
+    notes?: string;
+  },
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/patients/${patientId}/appointments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...actorHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, `Failed to create appointment (${response.status})`));
+  }
+}
+
+export async function uploadPatientDocument(
+  patientId: string,
+  file: File,
+  documentType: string,
+  notes: string = "",
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("document_type", documentType);
+  formData.append("notes", notes);
+
+  const response = await fetch(`${API_BASE}/patients/${patientId}/documents/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, `Failed to upload document (${response.status})`));
+  }
 }

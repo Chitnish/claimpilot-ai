@@ -11,6 +11,7 @@ import {
   MessageSquareWarning,
   Upload,
   UserCircle2,
+  Users,
   Wallet,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ const REVIEW_POLL_INTERVAL_MS = 30_000;
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/claims", label: "Claims", icon: FileText },
+  { href: "/patients", label: "Patients", icon: Users },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/ar", label: "Accounts Receivable", icon: Wallet },
   { href: "/review", label: "Review", icon: ClipboardList, showBadge: true },

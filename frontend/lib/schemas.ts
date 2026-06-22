@@ -608,3 +608,223 @@ export const arAgingSchema = z
   }));
 
 export type ArAging = z.infer<typeof arAgingSchema>;
+
+export const patientListItemSchema = z
+  .object({
+    id: z.string(),
+    first_name: z.string().default(""),
+    last_name: z.string().default(""),
+    dob: z.string().default(""),
+    payer_name: z.string().default(""),
+    member_id: z.string().default(""),
+    phone_primary: z.string().default(""),
+    total_claims: z.number().default(0),
+    total_billed: z.number().default(0),
+    last_visit: z.string().default(""),
+  })
+  .transform((data) => ({
+    id: data.id,
+    firstName: data.first_name,
+    lastName: data.last_name,
+    dob: data.dob,
+    payerName: data.payer_name,
+    memberId: data.member_id,
+    phonePrimary: data.phone_primary,
+    totalClaims: data.total_claims,
+    totalBilled: data.total_billed,
+    lastVisit: data.last_visit,
+  }));
+
+export type PatientListItem = z.infer<typeof patientListItemSchema>;
+
+export const patientListResponseSchema = z
+  .object({
+    items: z.array(patientListItemSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+  })
+  .transform((data) => ({
+    items: data.items,
+    total: data.total,
+    limit: data.limit,
+    offset: data.offset,
+  }));
+
+export type PatientListResponse = z.infer<typeof patientListResponseSchema>;
+
+export const patientRecordSchema = z
+  .object({
+    id: z.string(),
+    org_id: z.string().nullable().optional(),
+    first_name: z.string().nullable().optional(),
+    last_name: z.string().nullable().optional(),
+    middle_name: z.string().nullable().optional(),
+    preferred_name: z.string().nullable().optional(),
+    gender: z.string().nullable().optional(),
+    dob: z.string().nullable().optional(),
+    ssn_last4: z.string().nullable().optional(),
+    member_id: z.string().nullable().optional(),
+    payer_name: z.string().nullable().optional(),
+    address_line1: z.string().nullable().optional(),
+    address_line2: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
+    zip_code: z.string().nullable().optional(),
+    phone_primary: z.string().nullable().optional(),
+    phone_secondary: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    emergency_contact_name: z.string().nullable().optional(),
+    emergency_contact_relationship: z.string().nullable().optional(),
+    emergency_contact_phone: z.string().nullable().optional(),
+    responsible_party_name: z.string().nullable().optional(),
+    responsible_party_relationship: z.string().nullable().optional(),
+    responsible_party_dob: z.string().nullable().optional(),
+    responsible_party_phone: z.string().nullable().optional(),
+    insurance_plan_name: z.string().nullable().optional(),
+    insurance_group_number: z.string().nullable().optional(),
+    insurance_plan_type: z.string().nullable().optional(),
+    insurance_effective_date: z.string().nullable().optional(),
+    insurance_copay: z.number().nullable().optional(),
+    insurance_deductible: z.number().nullable().optional(),
+    secondary_payer_name: z.string().nullable().optional(),
+    secondary_member_id: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+  })
+  .transform((data) => ({
+    id: data.id,
+    orgId: data.org_id ?? "",
+    firstName: data.first_name ?? "",
+    lastName: data.last_name ?? "",
+    middleName: data.middle_name ?? "",
+    preferredName: data.preferred_name ?? "",
+    gender: data.gender ?? "",
+    dob: data.dob ?? "",
+    ssnLast4: data.ssn_last4 ?? "",
+    memberId: data.member_id ?? "",
+    payerName: data.payer_name ?? "",
+    addressLine1: data.address_line1 ?? "",
+    addressLine2: data.address_line2 ?? "",
+    city: data.city ?? "",
+    state: data.state ?? "",
+    zipCode: data.zip_code ?? "",
+    phonePrimary: data.phone_primary ?? "",
+    phoneSecondary: data.phone_secondary ?? "",
+    email: data.email ?? "",
+    emergencyContactName: data.emergency_contact_name ?? "",
+    emergencyContactRelationship: data.emergency_contact_relationship ?? "",
+    emergencyContactPhone: data.emergency_contact_phone ?? "",
+    responsiblePartyName: data.responsible_party_name ?? "",
+    responsiblePartyRelationship: data.responsible_party_relationship ?? "",
+    responsiblePartyDob: data.responsible_party_dob ?? "",
+    responsiblePartyPhone: data.responsible_party_phone ?? "",
+    insurancePlanName: data.insurance_plan_name ?? "",
+    insuranceGroupNumber: data.insurance_group_number ?? "",
+    insurancePlanType: data.insurance_plan_type ?? "",
+    insuranceEffectiveDate: data.insurance_effective_date ?? "",
+    insuranceCopay: data.insurance_copay ?? 0,
+    insuranceDeductible: data.insurance_deductible ?? 0,
+    secondaryPayerName: data.secondary_payer_name ?? "",
+    secondaryMemberId: data.secondary_member_id ?? "",
+    notes: data.notes ?? "",
+  }));
+
+export type PatientRecord = z.infer<typeof patientRecordSchema>;
+
+export const patientClaimSchema = z
+  .object({
+    id: z.string(),
+    status: z.string().nullable().optional(),
+    total_charge: z.number().nullable().optional(),
+    denial_risk: z.number().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+    payer_name: z.string().nullable().optional(),
+  })
+  .transform((data) => ({
+    claimId: data.id,
+    status: data.status ?? "",
+    totalCharge: data.total_charge ?? 0,
+    denialRisk: data.denial_risk ?? 0,
+    createdAt: data.created_at ?? "",
+    payerName: data.payer_name ?? "",
+  }));
+
+export type PatientClaim = z.infer<typeof patientClaimSchema>;
+
+export const patientAppointmentSchema = z
+  .object({
+    id: z.string(),
+    appointment_date: z.string(),
+    appointment_time: z.string().nullable().optional(),
+    provider_name: z.string().nullable().optional(),
+    appointment_type: z.string().nullable().optional(),
+    status: z.string().default("scheduled"),
+    notes: z.string().nullable().optional(),
+  })
+  .transform((data) => ({
+    id: data.id,
+    appointmentDate: data.appointment_date,
+    appointmentTime: data.appointment_time ?? "",
+    providerName: data.provider_name ?? "",
+    appointmentType: data.appointment_type ?? "",
+    status: data.status,
+    notes: data.notes ?? "",
+  }));
+
+export type PatientAppointment = z.infer<typeof patientAppointmentSchema>;
+
+export const patientDocumentSchema = z
+  .object({
+    id: z.string(),
+    document_type: z.string(),
+    document_name: z.string(),
+    storage_path: z.string(),
+    uploaded_at: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    download_url: z.string().nullable().optional(),
+  })
+  .transform((data) => ({
+    id: data.id,
+    documentType: data.document_type,
+    documentName: data.document_name,
+    storagePath: data.storage_path,
+    uploadedAt: data.uploaded_at ?? "",
+    notes: data.notes ?? "",
+    downloadUrl: data.download_url ?? "",
+  }));
+
+export type PatientDocument = z.infer<typeof patientDocumentSchema>;
+
+export const patientStatsSchema = z
+  .object({
+    total_claims: z.number().default(0),
+    total_billed: z.number().default(0),
+    total_patient_responsibility: z.number().default(0),
+    active_insurance: z.boolean().default(false),
+  })
+  .transform((data) => ({
+    totalClaims: data.total_claims,
+    totalBilled: data.total_billed,
+    totalPatientResponsibility: data.total_patient_responsibility,
+    activeInsurance: data.active_insurance,
+  }));
+
+export type PatientStats = z.infer<typeof patientStatsSchema>;
+
+export const patientDetailSchema = z
+  .object({
+    patient: patientRecordSchema,
+    claims: z.array(patientClaimSchema).default([]),
+    appointments: z.array(patientAppointmentSchema).default([]),
+    documents: z.array(patientDocumentSchema).default([]),
+    stats: patientStatsSchema,
+  })
+  .transform((data) => ({
+    patient: data.patient,
+    claims: data.claims,
+    appointments: data.appointments,
+    documents: data.documents,
+    stats: data.stats,
+  }));
+
+export type PatientDetail = z.infer<typeof patientDetailSchema>;
