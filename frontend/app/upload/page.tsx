@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone, type FileRejection } from "react-dropzone";
-import { CheckCircle2, Files, FileUp, Loader2, Upload, X } from "lucide-react";
+import {
+  CheckCircle2,
+  CloudUpload,
+  FileText,
+  Loader2,
+  X,
+} from "lucide-react";
 
 import { uploadClaim, uploadClaimBatch } from "@/lib/api";
 import type { BatchUploadItem } from "@/lib/schemas";
@@ -24,6 +30,12 @@ const ACCEPTED_TYPES = {
   "image/png": [".png"],
   "image/jpeg": [".jpg", ".jpeg"],
 } as const;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 export default function UploadPage(): React.ReactElement {
   const router = useRouter();
@@ -97,23 +109,18 @@ export default function UploadPage(): React.ReactElement {
   });
 
   const fileCount = selectedFiles.length;
-  const showMultiIcon = fileCount > 1;
 
   return (
-    <div className="flex min-h-full items-center justify-center p-8">
-      <Card className="w-full max-w-lg border-[#1e3a5f]/20 shadow-lg">
+    <div className="flex min-h-full items-center justify-center p-6 lg:p-8">
+      <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-[#1e3a5f] text-white">
-            {showMultiIcon ? (
-              <Files className="size-6" />
-            ) : (
-              <Upload className="size-6" />
-            )}
+          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-md shadow-brand/20">
+            <CloudUpload className="size-6" />
           </div>
-          <CardTitle className="text-[#1e3a5f]">Upload Superbill</CardTitle>
+          <CardTitle className="text-slate-900">Upload Superbills</CardTitle>
           <CardDescription>
-            You can upload multiple superbills at once — each becomes a separate
-            claim processed in parallel.
+            Each superbill becomes a separate claim, processed in parallel
+            through the pipeline.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -133,12 +140,15 @@ export default function UploadPage(): React.ReactElement {
                   <li key={item.claimId}>
                     <Link
                       href={`/claims/${item.claimId}`}
-                      className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors hover:border-[#1e3a5f]/40 hover:bg-[#1e3a5f]/5"
+                      className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:border-brand/40 hover:bg-sky-50"
                     >
-                      <span className="truncate font-medium text-[#1e3a5f]">
-                        {item.filename}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <FileText className="size-4 shrink-0 text-slate-400" />
+                        <span className="truncate font-medium text-slate-800">
+                          {item.filename}
+                        </span>
                       </span>
-                      <span className="ml-2 shrink-0 font-mono text-xs text-muted-foreground">
+                      <span className="ml-2 shrink-0 font-mono text-xs text-slate-500">
                         {item.claimId.slice(0, 8)}…
                       </span>
                     </Link>
@@ -155,7 +165,7 @@ export default function UploadPage(): React.ReactElement {
                 </Button>
                 <Button
                   type="button"
-                  className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"
+                  className="bg-brand text-white hover:bg-brand-dark"
                   asChild
                 >
                   <Link href="/dashboard">Go to dashboard</Link>
@@ -167,45 +177,36 @@ export default function UploadPage(): React.ReactElement {
               <div
                 {...getRootProps()}
                 className={cn(
-                  "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 transition-colors",
+                  "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-14 text-center transition-colors",
                   isDragActive
-                    ? "border-[#1e3a5f] bg-[#1e3a5f]/5"
-                    : "border-muted-foreground/25 hover:border-[#1e3a5f]/50 hover:bg-muted/30",
+                    ? "border-solid border-brand bg-blue-50"
+                    : "border-brand/40 hover:border-brand/70 hover:bg-slate-50",
                   uploading && "pointer-events-none opacity-60",
                 )}
               >
                 <input {...getInputProps()} />
                 {uploading ? (
                   <>
-                    <Loader2 className="mb-3 size-10 animate-spin text-[#1e3a5f]" />
-                    <p className="text-sm font-medium text-[#1e3a5f]">
+                    <Loader2 className="mb-3 size-12 animate-spin text-brand" />
+                    <p className="text-sm font-medium text-slate-700">
                       Uploading and starting pipelines…
                     </p>
                   </>
                 ) : (
                   <>
-                    {showMultiIcon ? (
-                      <Files className="mb-3 size-10 text-[#1e3a5f]" />
-                    ) : (
-                      <FileUp className="mb-3 size-10 text-muted-foreground" />
-                    )}
-                    <p className="text-sm font-medium">
-                      {isDragActive
-                        ? "Drop files here"
-                        : "Drag & drop files here, or click to browse"}
+                    <CloudUpload
+                      className={cn(
+                        "mb-3 size-12 transition-colors",
+                        isDragActive ? "text-brand" : "text-slate-400",
+                      )}
+                    />
+                    <p className="text-base font-semibold text-slate-900">
+                      {isDragActive ? "Drop to upload" : "Drop superbills here"}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      PDF, PNG, or JPG
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      PDF or image files — upload multiple at once for batch
+                      processing
                     </p>
-                    {fileCount > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="mt-3 border-[#1e3a5f]/20 bg-[#1e3a5f]/10 text-[#1e3a5f]"
-                      >
-                        {fileCount} {fileCount === 1 ? "file" : "files"}{" "}
-                        selected
-                      </Badge>
-                    )}
                   </>
                 )}
               </div>
@@ -215,13 +216,23 @@ export default function UploadPage(): React.ReactElement {
                   {selectedFiles.map((file, index) => (
                     <li
                       key={`${file.name}-${file.size}-${index}`}
-                      className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+                      className="flex items-center gap-3 rounded-lg border border-border bg-slate-50 px-3 py-2 text-sm"
                     >
-                      <span className="truncate font-medium">{file.name}</span>
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm">
+                        <FileText className="size-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-slate-800">
+                          {file.name}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {formatFileSize(file.size)}
+                        </span>
+                      </span>
                       <button
                         type="button"
                         onClick={() => removeFile(index)}
-                        className="ml-2 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-destructive/10 hover:text-destructive"
                         aria-label={`Remove ${file.name}`}
                       >
                         <X className="size-4" />
@@ -238,23 +249,31 @@ export default function UploadPage(): React.ReactElement {
               )}
 
               {!uploading && (
-                <div className="mt-4 flex justify-center gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={open}
-                  >
-                    {fileCount > 0 ? "Add more files" : "Select files"}
-                  </Button>
+                <div className="mt-5 flex flex-col items-center gap-3">
                   {fileCount > 0 && (
-                    <Button
-                      type="button"
-                      className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"
-                      onClick={handleUploadAll}
+                    <Badge
+                      variant="outline"
+                      className="border-sky-200 bg-sky-50 text-brand-dark"
                     >
-                      Upload {fileCount === 1 ? "file" : "all"}
-                    </Button>
+                      {fileCount} {fileCount === 1 ? "file" : "files"} selected
+                    </Badge>
                   )}
+                  <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:justify-center">
+                    <Button type="button" variant="outline" onClick={open}>
+                      {fileCount > 0 ? "Add more files" : "Select files"}
+                    </Button>
+                    {fileCount > 0 && (
+                      <Button
+                        type="button"
+                        size="lg"
+                        className="w-full bg-brand text-white hover:bg-brand-dark sm:w-auto"
+                        onClick={handleUploadAll}
+                      >
+                        <CloudUpload className="size-4" />
+                        Upload {fileCount === 1 ? "file" : `all ${fileCount}`}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </>
