@@ -39,6 +39,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -49,6 +51,10 @@ import {
 } from "@/components/ui/table";
 
 const REFRESH_INTERVAL_MS = 30_000;
+const CHART_PRIMARY = "#0ea5e9";
+const DENIAL_RED = "#ef4444";
+
+const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-500";
 
 export default function AnalyticsPage(): React.ReactElement {
   const [data, setData] = useState<Analytics | null>(null);
@@ -85,7 +91,7 @@ export default function AnalyticsPage(): React.ReactElement {
   if (!data) {
     return (
       <div className="flex min-h-full items-center justify-center p-8">
-        <Loader2 className="size-8 animate-spin text-[#1e3a5f]" />
+        <Loader2 className="size-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -105,74 +111,45 @@ export default function AnalyticsPage(): React.ReactElement {
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">Analytics</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          Analytics
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Denial patterns, payer performance, and claim volume
         </p>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Claims
-            </CardTitle>
-            <FileText className="size-4 text-[#1e3a5f]" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{data.totalClaims}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Billed
-            </CardTitle>
-            <DollarSign className="size-4 text-[#1e3a5f]" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {formatCurrency(data.totalBilled)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Denial Rate
-            </CardTitle>
-            <TrendingDown className="size-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {Math.round(data.denialRate * 100)}%
-            </p>
-            <p className="text-xs text-muted-foreground">
-              of adjudicated claims
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              High-Risk Open Claims
-            </CardTitle>
-            <AlertTriangle className="size-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{data.highRiskOpen}</p>
-            <p className="text-xs text-muted-foreground">
-              ≥60% predicted denial risk, not yet submitted
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Total Claims"
+          value={data.totalClaims}
+          icon={FileText}
+          accent="blue"
+        />
+        <StatCard
+          label="Total Billed"
+          value={formatCurrency(data.totalBilled)}
+          icon={DollarSign}
+          accent="blue"
+        />
+        <StatCard
+          label="Denial Rate"
+          value={`${Math.round(data.denialRate * 100)}%`}
+          subtitle="of adjudicated claims"
+          icon={TrendingDown}
+          accent="red"
+        />
+        <StatCard
+          label="High-Risk Open Claims"
+          value={data.highRiskOpen}
+          subtitle="≥60% predicted denial risk, not yet submitted"
+          icon={AlertTriangle}
+          accent="amber"
+        />
       </div>
 
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-[#1e3a5f]">
+      <div className="mb-3 flex items-center gap-3 border-t border-border pt-5">
+        <h2 className="text-base font-semibold text-slate-900">
           Operational KPIs
         </h2>
         <span className="text-xs text-muted-foreground">
@@ -180,82 +157,56 @@ export default function AnalyticsPage(): React.ReactElement {
         </span>
       </div>
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Clean Claim Rate
-            </CardTitle>
-            <ShieldCheck className="size-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {data.adjudicatedCount > 0
-                ? `${Math.round(data.cleanClaimRate * 100)}%`
-                : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {data.metricDefinitions.clean_claim_rate ??
-                "First-pass payer acceptance"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Manual-Touch Rate
-            </CardTitle>
-            <Hand className="size-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {data.adjudicatedCount > 0
-                ? `${Math.round(data.touchRate * 100)}%`
-                : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Lower is better — needed human review
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Auto-Processed
-            </CardTitle>
-            <Zap className="size-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{data.autoProcessedCount}</p>
-            <p className="text-xs text-muted-foreground">
-              Touchless, end-to-end
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Avg Processing Time
-            </CardTitle>
-            <Clock className="size-4 text-[#1e3a5f]" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {formatAvgProcessingSeconds(avgProcessingSeconds)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Industry avg: 3-5 days
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Clean Claim Rate"
+          value={
+            data.adjudicatedCount > 0
+              ? `${Math.round(data.cleanClaimRate * 100)}%`
+              : "—"
+          }
+          subtitle={
+            data.metricDefinitions.clean_claim_rate ??
+            "First-pass payer acceptance"
+          }
+          icon={ShieldCheck}
+          accent="green"
+        />
+        <StatCard
+          label="Manual-Touch Rate"
+          value={
+            data.adjudicatedCount > 0
+              ? `${Math.round(data.touchRate * 100)}%`
+              : "—"
+          }
+          subtitle="Lower is better — needed human review"
+          icon={Hand}
+          accent="amber"
+        />
+        <StatCard
+          label="Auto-Processed"
+          value={data.autoProcessedCount}
+          subtitle="Touchless, end-to-end"
+          icon={Zap}
+          accent="blue"
+        />
+        <StatCard
+          label="Avg Processing Time"
+          value={formatAvgProcessingSeconds(avgProcessingSeconds)}
+          subtitle="Industry avg: 3–5 days"
+          icon={Clock}
+          accent="slate"
+        />
       </div>
 
+      <h2 className="mb-3 border-t border-border pt-5 text-base font-semibold text-slate-900">
+        Denial &amp; Pipeline Insights
+      </h2>
       <div className="mb-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Top Denial Reasons</CardTitle>
+            <CardTitle className="text-base text-slate-900">
+              Top Denial Reasons
+            </CardTitle>
             <CardDescription>
               Claim adjustment reason codes (CARC) across denied claims
             </CardDescription>
@@ -273,39 +224,47 @@ export default function AnalyticsPage(): React.ReactElement {
                     layout="vertical"
                     margin={{ left: 8, right: 16 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="#e2e8f0"
+                    />
                     <XAxis
                       type="number"
                       allowDecimals={false}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
                     />
                     <YAxis
                       type="category"
                       dataKey="label"
                       width={72}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: "#64748b" }}
                     />
                     <Tooltip
+                      cursor={{ fill: "rgba(239,68,68,0.06)" }}
+                      contentStyle={{
+                        borderRadius: 8,
+                        border: "1px solid #e2e8f0",
+                        fontSize: 12,
+                      }}
                       formatter={(value) => [value, "Claims"]}
                       labelFormatter={(label) => {
-                        const entry = denialData.find(
-                          (d) => d.label === label,
-                        );
+                        const entry = denialData.find((d) => d.label === label);
                         return entry
                           ? `${entry.label} — ${entry.description}`
                           : label;
                       }}
                     />
-                    <Bar dataKey="count" fill="#dc2626" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="count" fill={DENIAL_RED} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="mt-3 space-y-1 border-t pt-3">
+                <div className="mt-3 space-y-1 border-t border-border pt-3">
                   {denialData.map((reason) => (
                     <p
                       key={reason.label}
                       className="text-xs text-muted-foreground"
                     >
-                      <span className="font-mono font-medium text-foreground">
+                      <span className="font-mono font-medium text-slate-700">
                         {reason.label}
                       </span>{" "}
                       — {reason.description}
@@ -319,7 +278,9 @@ export default function AnalyticsPage(): React.ReactElement {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Claims by Status</CardTitle>
+            <CardTitle className="text-base text-slate-900">
+              Claims by Status
+            </CardTitle>
             <CardDescription>Current pipeline distribution</CardDescription>
           </CardHeader>
           <CardContent>
@@ -330,18 +291,32 @@ export default function AnalyticsPage(): React.ReactElement {
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={statusData} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#e2e8f0"
+                  />
                   <XAxis
                     dataKey="status"
-                    tick={{ fontSize: 11 }}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
                     interval={0}
                     angle={-25}
                     textAnchor="end"
                     height={60}
                   />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#1e3a5f" radius={[4, 4, 0, 0]} />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "rgba(14,165,233,0.06)" }}
+                    contentStyle={{
+                      borderRadius: 8,
+                      border: "1px solid #e2e8f0",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="count" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -352,7 +327,9 @@ export default function AnalyticsPage(): React.ReactElement {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Payer Performance</CardTitle>
+            <CardTitle className="text-base text-slate-900">
+              Payer Performance
+            </CardTitle>
             <CardDescription>
               Volume, billed charges, and denial rate by payer
             </CardDescription>
@@ -363,51 +340,65 @@ export default function AnalyticsPage(): React.ReactElement {
                 No payer data
               </p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Payer</TableHead>
-                    <TableHead className="text-right">Claims</TableHead>
-                    <TableHead className="text-right">Billed</TableHead>
-                    <TableHead className="text-right">Denial rate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.payers.map((payer) => (
-                    <TableRow key={payer.payer}>
-                      <TableCell className="text-sm font-medium">
-                        {payer.payer}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {payer.claims}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(payer.billed)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge
-                          variant={
-                            payer.denialRate >= 0.3
-                              ? "danger"
-                              : payer.denialRate >= 0.15
-                                ? "warning"
-                                : "success"
-                          }
-                        >
-                          {Math.round(payer.denialRate * 100)}%
-                        </Badge>
-                      </TableCell>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className={thClass}>Payer</TableHead>
+                      <TableHead className={cn(thClass, "text-right")}>
+                        Claims
+                      </TableHead>
+                      <TableHead className={cn(thClass, "text-right")}>
+                        Billed
+                      </TableHead>
+                      <TableHead className={cn(thClass, "text-right")}>
+                        Denial rate
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {data.payers.map((payer) => (
+                      <TableRow
+                        key={payer.payer}
+                        className="odd:bg-white even:bg-slate-50/50 hover:bg-blue-50/50"
+                      >
+                        <TableCell className="text-sm font-medium text-slate-800">
+                          {payer.payer}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {payer.claims}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(payer.billed)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              payer.denialRate >= 0.3
+                                ? "bg-red-100 text-red-800 border-red-200"
+                                : payer.denialRate >= 0.15
+                                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                                  : "bg-emerald-100 text-emerald-800 border-emerald-200",
+                            )}
+                          >
+                            {Math.round(payer.denialRate * 100)}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Daily Claim Volume</CardTitle>
+            <CardTitle className="text-base text-slate-900">
+              Daily Claim Volume
+            </CardTitle>
             <CardDescription>
               Claims received per day (last 14 days with activity)
             </CardDescription>
@@ -423,16 +414,32 @@ export default function AnalyticsPage(): React.ReactElement {
                   data={data.dailyVolume}
                   margin={{ left: 0, right: 8 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#e2e8f0"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 8,
+                      border: "1px solid #e2e8f0",
+                      fontSize: 12,
+                    }}
+                  />
                   <Line
                     type="monotone"
                     dataKey="claims"
-                    stroke="#1e3a5f"
-                    strokeWidth={2}
-                    dot={{ fill: "#1e3a5f", r: 4 }}
+                    stroke={CHART_PRIMARY}
+                    strokeWidth={2.5}
+                    dot={{ fill: CHART_PRIMARY, r: 4 }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
