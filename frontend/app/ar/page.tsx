@@ -6,12 +6,13 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Loader2, Users, Wallet } from "lucide-react";
+import { Banknote, Loader2, Wallet } from "lucide-react";
 
 import { getArAging } from "@/lib/api";
 import { formatCurrency } from "@/lib/claim-ui";
@@ -24,6 +25,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { StatCard, type StatAccent } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -34,21 +38,36 @@ import {
 } from "@/components/ui/table";
 
 const REFRESH_INTERVAL_MS = 30_000;
+const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-500";
 
-function bucketBadgeVariant(
-  bucket: string,
-): "success" | "warning" | "danger" | "secondary" {
+const BUCKET_ORDER = ["0-30", "31-60", "61-90", "90+"] as const;
+
+const BUCKET_ACCENT: Record<string, StatAccent> = {
+  "0-30": "green",
+  "31-60": "amber",
+  "61-90": "orange",
+  "90+": "red",
+};
+
+const BUCKET_BAR_COLOR: Record<string, string> = {
+  "0-30": "#22c55e",
+  "31-60": "#f59e0b",
+  "61-90": "#f97316",
+  "90+": "#ef4444",
+};
+
+function bucketBadgeClass(bucket: string): string {
   switch (bucket) {
     case "0-30":
-      return "success";
+      return "bg-emerald-100 text-emerald-800 border-emerald-200";
     case "31-60":
-      return "warning";
+      return "bg-amber-100 text-amber-800 border-amber-200";
     case "61-90":
-      return "danger";
+      return "bg-orange-100 text-orange-800 border-orange-200";
     case "90+":
-      return "danger";
+      return "bg-red-100 text-red-800 border-red-200";
     default:
-      return "secondary";
+      return "bg-slate-100 text-slate-700 border-slate-200";
   }
 }
 
@@ -85,21 +104,26 @@ export default function AccountsReceivablePage(): React.ReactElement {
   if (!data) {
     return (
       <div className="flex min-h-full items-center justify-center p-8">
-        <Loader2 className="size-8 animate-spin text-[#1e3a5f]" />
+        <Loader2 className="size-8 animate-spin text-brand" />
       </div>
     );
   }
 
-  const chartData = data.buckets.map((b) => ({
-    bucket: `${b.bucket} days`,
-    amount: b.amount,
-    count: b.count,
-  }));
+  const bucketMap = new Map(data.buckets.map((b) => [b.bucket, b]));
+  const chartData = BUCKET_ORDER.map((bucket) => {
+    const b = bucketMap.get(bucket);
+    return {
+      bucket: `${bucket} days`,
+      raw: bucket,
+      amount: b?.amount ?? 0,
+      count: b?.count ?? 0,
+    };
+  });
 
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
           Accounts Receivable
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -108,65 +132,67 @@ export default function AccountsReceivablePage(): React.ReactElement {
         </p>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Patient A/R
-            </CardTitle>
-            <Wallet className="size-4 text-[#1e3a5f]" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {formatCurrency(data.totalOutstanding)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Open Accounts
-            </CardTitle>
-            <Users className="size-4 text-[#1e3a5f]" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{data.openAccounts}</p>
-          </CardContent>
-        </Card>
-
-        {data.buckets.slice(2).map((b) => (
-          <Card key={b.bucket}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {b.bucket} days
-              </CardTitle>
-              <Badge variant={bucketBadgeVariant(b.bucket)}>{b.count}</Badge>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{formatCurrency(b.amount)}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard
+          label="Total Patient A/R"
+          value={formatCurrency(data.totalOutstanding)}
+          subtitle={`${data.openAccounts} open account${data.openAccounts === 1 ? "" : "s"}`}
+          icon={Wallet}
+          accent="blue"
+        />
+        {BUCKET_ORDER.map((bucket) => {
+          const b = bucketMap.get(bucket);
+          return (
+            <StatCard
+              key={bucket}
+              label={`${bucket} days`}
+              value={formatCurrency(b?.amount ?? 0)}
+              subtitle={`${b?.count ?? 0} account${(b?.count ?? 0) === 1 ? "" : "s"}`}
+              icon={Banknote}
+              accent={BUCKET_ACCENT[bucket] ?? "slate"}
+            />
+          );
+        })}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-base">Aging buckets</CardTitle>
+            <CardTitle className="text-base text-slate-900">
+              Aging Buckets
+            </CardTitle>
             <CardDescription>Patient balance by days outstanding</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#e2e8f0"
+                />
+                <XAxis
+                  dataKey="bucket"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                />
+                <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
                 <Tooltip
                   formatter={(value) => formatCurrency(Number(value))}
-                  cursor={{ fill: "rgba(30,58,95,0.06)" }}
+                  cursor={{ fill: "rgba(15,23,42,0.04)" }}
+                  contentStyle={{
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    fontSize: 12,
+                  }}
                 />
-                <Bar dataKey="amount" fill="#1e3a5f" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry) => (
+                    <Cell
+                      key={entry.raw}
+                      fill={BUCKET_BAR_COLOR[entry.raw] ?? "#0ea5e9"}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -174,7 +200,9 @@ export default function AccountsReceivablePage(): React.ReactElement {
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Outstanding patient balances</CardTitle>
+            <CardTitle className="text-base text-slate-900">
+              Outstanding Patient Balances
+            </CardTitle>
             <CardDescription>
               {data.openAccounts} open account
               {data.openAccounts === 1 ? "" : "s"} · sorted by age
@@ -182,52 +210,70 @@ export default function AccountsReceivablePage(): React.ReactElement {
           </CardHeader>
           <CardContent>
             {data.accounts.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">
-                <Wallet className="mx-auto mb-3 size-8 text-muted-foreground/40" />
-                <p>No outstanding patient balances.</p>
-                <p className="mt-1 text-xs">
-                  Patient A/R appears here once reconciled claims leave a balance
-                  (requires migration 0004 for historical roll-up).
-                </p>
-              </div>
+              <EmptyState
+                icon={Wallet}
+                title="No outstanding patient balances"
+                description="Patient A/R appears here once reconciled claims leave a balance (requires migration 0004 for historical roll-up)."
+              />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Account</TableHead>
-                    <TableHead>Payer</TableHead>
-                    <TableHead className="text-right">Age</TableHead>
-                    <TableHead>Bucket</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.accounts.map((a) => (
-                    <TableRow key={a.claimId}>
-                      <TableCell>
-                        <Link
-                          href={`/claims/${a.claimId}`}
-                          className="font-mono text-xs text-[#1e3a5f] underline underline-offset-2"
-                        >
-                          {a.claimId.slice(0, 8).toUpperCase()}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm">{a.payerName || "—"}</TableCell>
-                      <TableCell className="text-right text-sm">
-                        {a.ageDays}d
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={bucketBadgeVariant(a.bucket)}>
-                          {a.bucket}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(a.balance)}
-                      </TableCell>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className={thClass}>Account</TableHead>
+                      <TableHead className={thClass}>Payer</TableHead>
+                      <TableHead className={cn(thClass, "text-right")}>
+                        Age
+                      </TableHead>
+                      <TableHead className={thClass}>Bucket</TableHead>
+                      <TableHead className={cn(thClass, "text-right")}>
+                        Balance
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {data.accounts.map((a) => {
+                      const overdue = a.bucket === "90+";
+                      return (
+                        <TableRow
+                          key={a.claimId}
+                          className={cn(
+                            overdue
+                              ? "bg-red-50/70 hover:bg-red-50"
+                              : "odd:bg-white even:bg-slate-50/50 hover:bg-blue-50/50",
+                          )}
+                        >
+                          <TableCell>
+                            <Link
+                              href={`/claims/${a.claimId}`}
+                              className="font-mono text-xs font-medium text-brand hover:underline"
+                            >
+                              {a.claimId.slice(0, 8).toUpperCase()}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-700">
+                            {a.payerName || "—"}
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums text-slate-700">
+                            {a.ageDays}d
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={bucketBadgeClass(a.bucket)}
+                            >
+                              {a.bucket}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-bold tabular-nums text-slate-900">
+                            {formatCurrency(a.balance)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
