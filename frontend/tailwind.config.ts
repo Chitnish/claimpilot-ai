@@ -1,4 +1,4 @@
-﻿import type { Config } from "tailwindcss"
+import type { Config } from "tailwindcss"
 
 const config: Config = {
   darkMode: ["class"],
@@ -11,7 +11,18 @@ const config: Config = {
     "bg-red-500",
     "bg-amber-500",
     "bg-emerald-500",
+    "bg-orange-500",
     "bg-gray-200",
+    // Status pills + semantic accents are sometimes assembled from helper
+    // functions, so guarantee the palette ships even if a class only appears
+    // in a returned string.
+    {
+      pattern:
+        /(bg|text|border)-(emerald|amber|orange|red|blue|sky|gray|slate|purple|cyan|teal)-(50|100|200|300|600|700|800)/,
+    },
+    {
+      pattern: /border-l-(blue|emerald|amber|orange|red|purple|slate)-(400|500)/,
+    },
   ],
   theme: {
     container: {
@@ -26,6 +37,16 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        // Enterprise clinical palette
+        clinical: {
+          shell: "#0a0f1e", // app shell / deepest
+          sidebar: "#0d1426", // sidebar surface
+          content: "#f1f5f9", // page content canvas
+        },
+        brand: {
+          DEFAULT: "#0ea5e9", // clinical sky blue (accent)
+          dark: "#0369a1", // hover / pressed
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -54,6 +75,27 @@ const config: Config = {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
+      },
+      fontFamily: {
+        sans: [
+          "var(--font-sans)",
+          "var(--font-geist-sans)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
+        mono: [
+          "var(--font-geist-mono)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "monospace",
+        ],
+      },
+      boxShadow: {
+        card: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+        "card-hover":
+          "0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04)",
       },
       borderRadius: {
         lg: "var(--radius)",

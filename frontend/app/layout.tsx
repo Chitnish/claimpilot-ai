@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Geist } from "next/font/google";
 
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppShell } from "@/components/app-shell";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
@@ -35,10 +35,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
-        <div className="flex min-h-screen">
-          <AppSidebar />
-          <main className="flex-1 overflow-auto bg-muted/20">{children}</main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

@@ -35,6 +35,29 @@ export function statusBadgeVariant(status: string): BadgeVariant {
   }
 }
 
+// Standardized status pill colors, shared across every page so a given claim
+// status always reads the same. Returns Tailwind classes layered over the
+// Badge base (which already supplies layout + border width).
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  reconciled: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  paid: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  needs_review: "bg-amber-100 text-amber-800 border-amber-200",
+  appealed: "bg-orange-100 text-orange-800 border-orange-200",
+  denied: "bg-red-100 text-red-800 border-red-200",
+  submitted: "bg-blue-100 text-blue-800 border-blue-200",
+  draft: "bg-gray-100 text-gray-700 border-gray-200",
+  extracted: "bg-slate-100 text-slate-700 border-slate-200",
+  coded: "bg-purple-100 text-purple-800 border-purple-200",
+  scrubbed: "bg-cyan-100 text-cyan-800 border-cyan-200",
+};
+
+export function statusBadgeClass(status: string): string {
+  return (
+    STATUS_BADGE_CLASSES[status] ??
+    "bg-slate-100 text-slate-700 border-slate-200"
+  );
+}
+
 export function denialRiskColor(percent: number): string {
   if (percent >= 60) return "bg-red-500";
   if (percent >= 40) return "bg-amber-500";
