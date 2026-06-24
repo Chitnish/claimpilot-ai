@@ -21,7 +21,8 @@ const config: Config = {
         /(bg|text|border)-(emerald|amber|orange|red|blue|sky|gray|slate|purple|cyan|teal)-(50|100|200|300|600|700|800)/,
     },
     {
-      pattern: /border-l-(blue|emerald|amber|orange|red|purple|slate)-(400|500)/,
+      pattern:
+        /border-l-(blue|emerald|amber|orange|red|purple|slate|teal|cyan)-(300|400|500)/,
     },
   ],
   theme: {

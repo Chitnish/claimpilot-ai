@@ -128,9 +128,9 @@ export function ReviewCopilot({
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="size-4 text-[#1e3a5f]" />
-              Review copilot
+            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+              <Sparkles className="size-4 text-brand" />
+              Review Copilot
             </CardTitle>
             <CardDescription>
               Ask anything about this claim before approving or rejecting
@@ -142,8 +142,8 @@ export function ReviewCopilot({
             className={cn(
               "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
               plainLanguage
-                ? "border-[#1e3a5f] bg-[#1e3a5f] text-white"
-                : "border-gray-300 bg-background text-muted-foreground hover:bg-muted",
+                ? "border-brand bg-brand text-white"
+                : "border-slate-200 bg-background text-slate-600 hover:bg-slate-100",
             )}
           >
             Explain terms simply
@@ -170,7 +170,7 @@ export function ReviewCopilot({
                     key={prompt}
                     type="button"
                     onClick={() => void send(prompt)}
-                    className="rounded-full border border-gray-200 bg-muted/40 px-3 py-1.5 text-xs font-medium text-[#1e3a5f] transition-colors hover:bg-muted"
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-brand-dark transition-colors hover:bg-slate-100"
                   >
                     {prompt}
                   </button>
@@ -190,8 +190,8 @@ export function ReviewCopilot({
                   className={cn(
                     "flex size-7 shrink-0 items-center justify-center rounded-full",
                     turn.role === "user"
-                      ? "bg-[#1e3a5f] text-white"
-                      : "bg-muted text-[#1e3a5f]",
+                      ? "bg-brand text-white"
+                      : "bg-slate-100 text-brand",
                   )}
                 >
                   {turn.role === "user" ? (
@@ -210,12 +210,12 @@ export function ReviewCopilot({
                     className={cn(
                       "inline-block rounded-lg px-3 py-2 text-sm leading-relaxed",
                       turn.role === "user"
-                        ? "whitespace-pre-wrap bg-[#1e3a5f] text-white"
-                        : "bg-muted text-foreground",
+                        ? "whitespace-pre-wrap bg-brand text-white"
+                        : "bg-slate-100 text-foreground",
                     )}
                   >
                     {turn.role === "assistant" ? (
-                      <div className="prose prose-sm max-w-none text-left prose-headings:text-[#1e3a5f] prose-strong:text-[#1e3a5f] prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-ol:my-1.5 prose-ul:my-1.5 prose-li:my-0.5">
+                      <div className="prose prose-sm max-w-none text-left prose-headings:text-slate-900 prose-strong:text-slate-900 prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-ol:my-1.5 prose-ul:my-1.5 prose-li:my-0.5">
                         <ReactMarkdown>{turn.content}</ReactMarkdown>
                       </div>
                     ) : (
@@ -279,7 +279,7 @@ export function ReviewCopilot({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Ask about denials, corrections, codes, or next steps…"
-            className="max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#1e3a5f]"
+            className="max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           />
           <Button
             type="submit"

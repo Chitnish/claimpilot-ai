@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   AlertTriangle,
   Check,
@@ -32,7 +33,7 @@ import {
   denialRiskColor,
   formatCurrency,
   formatStatus,
-  statusBadgeVariant,
+  statusBadgeClass,
   truncateId,
 } from "@/lib/claim-ui";
 import { agentEventSchema, type Claim, type DisputeMessage, type TimelineEvent } from "@/lib/schemas";
@@ -70,12 +71,29 @@ function formatDisputeTimestamp(value: string): string {
 
 function disputeSenderLabel(sender: string): string {
   if (sender === "payer_reply") {
-    return "Reply to Appeal";
+    return "Payer";
   }
   if (sender === "ai_reply") {
-    return "AI Reply";
+    return "ClaimPilot AI";
   }
   return sender;
+}
+
+// Left-edge accent per agent type for the operations console feed.
+const AGENT_BORDER: Record<string, string> = {
+  intake: "border-l-blue-500",
+  eligibility: "border-l-teal-500",
+  coding: "border-l-purple-500",
+  scrub: "border-l-orange-500",
+  submission: "border-l-red-500",
+  reconciliation: "border-l-emerald-500",
+  fraud: "border-l-slate-400",
+  human_review: "border-l-amber-500",
+  system: "border-l-slate-300",
+};
+
+function agentBorderClass(agent: string): string {
+  return AGENT_BORDER[agent.toLowerCase()] ?? AGENT_BORDER.system;
 }
 
 export default function ClaimDetailPage(): React.ReactElement {
@@ -208,7 +226,7 @@ export default function ClaimDetailPage(): React.ReactElement {
   if (loading && !claim) {
     return (
       <div className="flex min-h-full items-center justify-center p-8">
-        <Loader2 className="size-8 animate-spin text-[#1e3a5f]" />
+        <Loader2 className="size-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -262,14 +280,20 @@ export default function ClaimDetailPage(): React.ReactElement {
     <div className="p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">
-            Claim {truncateId(claim.claimId, 12)}
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Claim{" "}
+            <span className="font-mono text-xl text-slate-700">
+              {truncateId(claim.claimId, 12)}
+            </span>
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Live pipeline activity and claim details
           </p>
         </div>
-        <Badge variant={statusBadgeVariant(claim.status)}>
+        <Badge
+          variant="outline"
+          className={cn("text-sm", statusBadgeClass(claim.status))}
+        >
           {formatStatus(claim.status)}
         </Badge>
       </div>
@@ -291,13 +315,13 @@ export default function ClaimDetailPage(): React.ReactElement {
       )}
 
       {claim.frequencyCode === "7" && claim.originalClaimId && (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-[#1e3a5f]/20 bg-[#eef3fa] p-4">
-          <RefreshCw className="mt-0.5 size-5 shrink-0 text-[#1e3a5f]" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4">
+          <RefreshCw className="mt-0.5 size-5 shrink-0 text-brand-dark" />
           <div className="text-sm">
-            <p className="font-semibold text-[#1e3a5f]">
+            <p className="font-semibold text-sky-900">
               Corrected claim (837P frequency 7 — replacement)
             </p>
-            <p className="mt-0.5 text-[#1e3a5f]/80">
+            <p className="mt-0.5 text-sky-800/90">
               Replaces original claim{" "}
               <Link
                 href={`/claims/${claim.originalClaimId}`}
@@ -314,7 +338,7 @@ export default function ClaimDetailPage(): React.ReactElement {
               .
             </p>
             {claim.correctionReason && (
-              <p className="mt-0.5 text-[#1e3a5f]/70">
+              <p className="mt-0.5 text-sky-800/70">
                 Reason: {claim.correctionReason}
               </p>
             )}
@@ -572,13 +596,13 @@ export default function ClaimDetailPage(): React.ReactElement {
                 )}
               </div>
               {claim.patientBalance > 0 && (
-                <div className="space-y-1.5 rounded-md border border-[#1e3a5f]/20 bg-[#eef3fa] p-3 text-sm">
+                <div className="space-y-1.5 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 font-medium text-[#1e3a5f]">
+                    <span className="flex items-center gap-1.5 font-medium text-sky-900">
                       <Receipt className="size-3.5" />
                       Patient balance due
                     </span>
-                    <span className="font-semibold text-[#1e3a5f]">
+                    <span className="font-semibold text-sky-900">
                       {formatCurrency(claim.patientBalance)}
                     </span>
                   </div>
@@ -725,7 +749,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                     </Button>
                     <Button
                       size="sm"
-                      className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90"
+                      className="bg-brand text-white hover:bg-brand-dark"
                       disabled={sending}
                       onClick={() => {
                         void (async () => {
@@ -777,63 +801,66 @@ export default function ClaimDetailPage(): React.ReactElement {
           />
         </div>
 
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">Agent activity</CardTitle>
-                <CardDescription>
-                  Real-time updates from the ClaimPilot pipeline
-                </CardDescription>
-              </div>
-              {isPaused ? (
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-600">
-                  <PauseCircle className="size-4 shrink-0" />
-                  Paused for review
-                </div>
-              ) : isDone ? (
-                <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
-                  <CheckCircle2 className="size-4 shrink-0" />
-                  Pipeline complete
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 shrink-0 animate-spin" />
-                  Live
-                </div>
-              )}
+        <Card className="overflow-hidden lg:col-span-2">
+          <div className="sidebar-surface flex flex-wrap items-center justify-between gap-3 border-b border-white/5 px-5 py-3.5">
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight text-white">
+                Agent Activity
+              </h2>
+              <p className="text-xs text-slate-400">
+                Real-time updates from the ClaimPilot pipeline
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-[32rem] space-y-0 overflow-y-auto pr-1">
+            {isPaused ? (
+              <div className="flex items-center gap-2 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-300">
+                <PauseCircle className="size-3.5 shrink-0" />
+                Paused for review
+              </div>
+            ) : isDone ? (
+              <div className="flex items-center gap-2 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                <CheckCircle2 className="size-3.5 shrink-0" />
+                Pipeline complete
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-full bg-brand/15 px-2.5 py-1 text-xs font-medium text-sky-300">
+                <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                Live
+              </div>
+            )}
+          </div>
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-1">
               {events.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
                   Waiting for agent events…
                 </p>
               ) : (
                 events.map((event, index) => (
-                  <div
+                  <motion.div
                     key={`${event.agent}-${event.event}-${index}`}
-                    className="relative flex gap-4 border-l-2 border-muted pb-6 pl-6 last:pb-0"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    className={cn(
+                      "mb-2 rounded-lg border border-border border-l-[3px] bg-slate-50/70 px-3 py-2.5 last:mb-0",
+                      agentBorderClass(event.agent),
+                    )}
                   >
-                    <div className="absolute -left-[5px] top-1.5 size-2 rounded-full bg-[#1e3a5f]" />
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize",
-                            agentBadgeClass(event.agent),
-                          )}
-                        >
-                          {event.agent}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {event.receivedAt.toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <p className="text-sm">{event.summary}</p>
+                    <div className="mb-0.5 flex flex-wrap items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize",
+                          agentBadgeClass(event.agent),
+                        )}
+                      >
+                        {event.agent.replace(/_/g, " ")}
+                      </span>
+                      <span className="font-mono text-[11px] text-slate-400">
+                        {event.receivedAt.toLocaleTimeString()}
+                      </span>
                     </div>
-                  </div>
+                    <p className="text-sm text-slate-700">{event.summary}</p>
+                  </motion.div>
                 ))
               )}
               <div ref={feedEndRef} />
@@ -1053,7 +1080,9 @@ export default function ClaimDetailPage(): React.ReactElement {
       {claim.disputeThread.length > 0 && (
         <section className="mt-8">
           <div className="mb-4">
-            <h2 className="text-xl font-bold text-[#1e3a5f]">Dispute Log</h2>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">
+              Dispute Log
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Email exchange following the appeal letter
             </p>
@@ -1075,29 +1104,37 @@ export default function ClaimDetailPage(): React.ReactElement {
                 </div>
               )}
               <div className="space-y-4">
-                {claim.disputeThread.map((msg: DisputeMessage, index: number) => (
-                  <div
-                    key={`${msg.sender}-${index}`}
-                    className={cn(
-                      "max-w-[70%] rounded-lg p-4 text-sm",
-                      msg.sender === "ai_reply"
-                        ? "ml-auto bg-[#1e3a5f]/10"
-                        : "mr-auto bg-muted",
-                    )}
-                  >
-                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-                      {disputeSenderLabel(msg.sender)}
-                      {msg.createdAt && (
-                        <span className="ml-2 font-normal">
-                          {formatDisputeTimestamp(msg.createdAt)}
-                        </span>
+                {claim.disputeThread.map((msg: DisputeMessage, index: number) => {
+                  const isAi = msg.sender === "ai_reply";
+                  return (
+                    <div
+                      key={`${msg.sender}-${index}`}
+                      className={cn(
+                        "max-w-[75%] rounded-lg p-4 text-sm",
+                        isAi
+                          ? "ml-auto border-l-4 border-blue-500 bg-blue-50"
+                          : "mr-auto bg-slate-100",
                       )}
-                    </p>
-                    <p className="whitespace-pre-wrap leading-relaxed text-foreground">
-                      {msg.messageText}
-                    </p>
-                  </div>
-                ))}
+                    >
+                      <p
+                        className={cn(
+                          "mb-1.5 text-xs font-semibold",
+                          isAi ? "text-blue-700" : "text-slate-600",
+                        )}
+                      >
+                        {disputeSenderLabel(msg.sender)}
+                        {msg.createdAt && (
+                          <span className="ml-2 font-normal text-slate-400">
+                            {formatDisputeTimestamp(msg.createdAt)}
+                          </span>
+                        )}
+                      </p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
+                        {msg.messageText}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

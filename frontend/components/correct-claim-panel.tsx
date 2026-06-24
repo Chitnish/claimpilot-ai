@@ -110,7 +110,7 @@ export function CorrectClaimPanel({
   }
 
   return (
-    <Card className="border-[#1e3a5f]/30">
+    <Card className="border-brand/30">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <FilePlus2 className="size-4" />
@@ -148,7 +148,7 @@ export function CorrectClaimPanel({
                       updateLine(index, "modifiers", e.target.value)
                     }
                     placeholder="e.g. 25, 59"
-                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30"
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
                   />
                 </label>
                 <label className="block">
@@ -161,7 +161,7 @@ export function CorrectClaimPanel({
                       updateLine(index, "icd10Codes", e.target.value)
                     }
                     placeholder="e.g. E11.9, I10"
-                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30"
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
                   />
                 </label>
               </div>
