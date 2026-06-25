@@ -34,7 +34,7 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-clinical-content">
       {/* Mobile top bar */}
-      <header className="sidebar-surface fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-white/5 px-4 text-white md:hidden">
+      <header className="sidebar-surface fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-white/10 px-4 text-white backdrop-blur-sm md:hidden">
         <button
           type="button"
           aria-label="Open navigation"
@@ -44,10 +44,10 @@ export function AppShell({
           <Menu className="size-5" />
         </button>
         <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-brand to-brand-dark">
+          <span className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-brand to-brand-dark shadow-md shadow-brand/30 ring-1 ring-white/20">
             <Activity className="size-4 text-white" />
           </span>
-          <span className="text-sm font-semibold tracking-tight">
+          <span className="font-display text-sm font-semibold tracking-tight">
             ClaimPilot AI
           </span>
         </div>

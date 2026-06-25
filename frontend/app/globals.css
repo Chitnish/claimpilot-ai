@@ -221,6 +221,18 @@
       box-shadow: 0 0 0 5px rgba(239, 68, 68, 0);
     }
   }
+  .animate-status-pulse-brand {
+    animation: status-pulse-brand 2.4s ease-in-out infinite;
+  }
+  @keyframes status-pulse-brand {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.5);
+    }
+    50% {
+      box-shadow: 0 0 0 5px rgba(14, 165, 233, 0);
+    }
+  }
 
   /* Live indicator sheen for ops-console headers. */
   .animate-shimmer {
@@ -241,6 +253,7 @@
   }
   .animate-status-pulse,
   .animate-status-pulse-danger,
+  .animate-status-pulse-brand,
   .animate-shimmer {
     animation: none !important;
   }
