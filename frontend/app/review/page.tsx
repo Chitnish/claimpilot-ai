@@ -6,14 +6,16 @@ import {
   AlertTriangle,
   CheckCheck,
   CheckCircle2,
+  ClipboardList,
+  DollarSign,
   Eye,
   Loader2,
+  ShieldAlert,
   X,
 } from "lucide-react";
 
 import { bulkResume, getReviewQueue, resumeClaim } from "@/lib/api";
 import {
-  denialRiskColor,
   formatCurrency,
   truncateId,
 } from "@/lib/claim-ui";
@@ -28,6 +30,8 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StatCard } from "@/components/ui/stat-card";
+import { CountUp, Stagger, StaggerItem } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 15_000;
@@ -56,6 +60,51 @@ function getReasonBadgeStyle(reason: string): ReasonBadgeStyle {
   return {
     className: "border-slate-200 bg-slate-100 text-slate-600",
     icon: null,
+  };
+}
+
+interface RiskTier {
+  label: string;
+  /** Whole-card top triage bar. */
+  bar: string;
+  /** Risk panel surround. */
+  panel: string;
+  /** Meter fill. */
+  meter: string;
+  /** Percentage chip styling. */
+  chip: string;
+  /** High-risk gets an alarming pulse + alert row. */
+  alarm: boolean;
+}
+
+function riskTier(pct: number): RiskTier {
+  if (pct >= 60) {
+    return {
+      label: "High denial risk",
+      bar: "from-red-500 to-rose-600",
+      panel: "border-red-200 bg-red-50",
+      meter: "bg-gradient-to-r from-red-500 to-rose-600",
+      chip: "bg-red-100 text-red-700",
+      alarm: true,
+    };
+  }
+  if (pct >= 40) {
+    return {
+      label: "Elevated denial risk",
+      bar: "from-amber-400 to-orange-500",
+      panel: "border-amber-200 bg-amber-50/70",
+      meter: "bg-gradient-to-r from-amber-400 to-orange-500",
+      chip: "bg-amber-100 text-amber-700",
+      alarm: false,
+    };
+  }
+  return {
+    label: "Low denial risk",
+    bar: "from-emerald-400 to-teal-500",
+    panel: "border-slate-200 bg-slate-50",
+    meter: "bg-gradient-to-r from-emerald-400 to-teal-500",
+    chip: "bg-emerald-100 text-emerald-700",
+    alarm: false,
   };
 }
 
@@ -186,17 +235,23 @@ export default function ReviewPage(): React.ReactElement {
     }
   };
 
+  const chargeAtRisk = items.reduce((sum, item) => sum + item.totalCharge, 0);
+  const highRiskCount = items.filter((item) => item.denialRisk >= 0.6).length;
+
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
               Review Queue
             </h1>
             <Badge
               variant="outline"
-              className="border-amber-200 bg-amber-100 text-amber-800"
+              className={cn(
+                "border-amber-200 bg-amber-100 text-amber-800",
+                items.length > 0 && "animate-status-pulse",
+              )}
             >
               {items.length} pending
             </Badge>
@@ -218,6 +273,49 @@ export default function ReviewPage(): React.ReactElement {
           </div>
         )}
       </div>
+
+      {items.length > 0 && (
+        <Stagger className="mb-6 grid gap-4 sm:grid-cols-3">
+          <StaggerItem>
+            <StatCard
+              label="Awaiting Decision"
+              value={<CountUp value={items.length} />}
+              subtitle="Claims paused for human approval"
+              icon={ClipboardList}
+              accent="amber"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              label="Charge at Risk"
+              value={
+                <CountUp
+                  value={chargeAtRisk}
+                  format={(n) =>
+                    new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                      maximumFractionDigits: 0,
+                    }).format(n)
+                  }
+                />
+              }
+              subtitle="Total billed across the queue"
+              icon={DollarSign}
+              accent="blue"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              label="High Denial Risk"
+              value={<CountUp value={highRiskCount} />}
+              subtitle="≥60% predicted denial — prioritize"
+              icon={ShieldAlert}
+              accent="red"
+            />
+          </StaggerItem>
+        </Stagger>
+      )}
 
       {selected.size > 0 && (
         <div className="sidebar-surface sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 px-4 py-3 text-white shadow-card">
@@ -271,9 +369,10 @@ export default function ReviewPage(): React.ReactElement {
           description="New claims that need a human decision will appear here automatically."
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <Stagger className="grid gap-4 lg:grid-cols-2">
           {items.map((item) => {
             const riskPercent = Math.round(item.denialRisk * 100);
+            const tier = riskTier(riskPercent);
             const reasonStyle = getReasonBadgeStyle(item.reason);
             const ReasonIcon = reasonStyle.icon;
             const detailsDenialRisk = item.details.denial_risk;
@@ -281,12 +380,20 @@ export default function ReviewPage(): React.ReactElement {
             const isActing = actingOn === item.id;
 
             return (
+              <StaggerItem key={item.id}>
               <Card
-                key={item.id}
-                className="cursor-pointer transition-shadow hover:shadow-card-hover"
+                className="card-lift relative h-full cursor-pointer overflow-hidden"
                 onClick={() => router.push(`/claims/${item.claimId}`)}
               >
-                <CardHeader className="pb-3">
+                {/* Risk triage bar */}
+                <span
+                  className={cn(
+                    "absolute inset-x-0 top-0 h-1 bg-gradient-to-r",
+                    tier.bar,
+                  )}
+                  aria-hidden
+                />
+                <CardHeader className="pb-3 pt-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       <input
@@ -307,27 +414,38 @@ export default function ReviewPage(): React.ReactElement {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-slate-500">Total charge</p>
-                      <p className="text-lg font-bold tabular-nums text-slate-900">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                        Total charge
+                      </p>
+                      <p className="font-display text-xl font-bold tabular-nums text-slate-900">
                         {formatCurrency(item.totalCharge)}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Denial risk</span>
-                      <span className="font-semibold tabular-nums text-slate-900">
+                  {/* Denial-risk triage panel */}
+                  <div className={cn("rounded-xl border p-3.5", tier.panel)}>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+                        {tier.alarm && (
+                          <ShieldAlert className="size-4 text-red-500" />
+                        )}
+                        Denial risk
+                      </span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-lg px-2.5 py-1 font-display text-xl font-bold tabular-nums",
+                          tier.chip,
+                          tier.alarm && "animate-status-pulse-danger",
+                        )}
+                      >
                         {riskPercent}%
                       </span>
                     </div>
-                    <div className="h-2.5 w-full rounded-full bg-slate-200">
+                    <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
                       <div
-                        className={cn(
-                          "h-2.5 rounded-full transition-all",
-                          denialRiskColor(riskPercent),
-                        )}
+                        className={cn("h-2.5 rounded-full", tier.meter)}
                         style={{ width: `${riskPercent}%` }}
                       />
                     </div>
@@ -337,6 +455,12 @@ export default function ReviewPage(): React.ReactElement {
                         {item.reason || "Review required"}
                       </Badge>
                     </div>
+                    {tier.alarm && (
+                      <p className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-red-700">
+                        <AlertTriangle className="size-3.5 shrink-0" />
+                        High denial risk — review carefully before approving.
+                      </p>
+                    )}
                   </div>
 
                   {(detailsDenialRisk !== undefined ||
@@ -385,7 +509,7 @@ export default function ReviewPage(): React.ReactElement {
 
                   <div className="flex gap-2 pt-1">
                     <Button
-                      className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
+                      className="press flex-1 bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-sm shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-700"
                       disabled={isActing}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -401,7 +525,7 @@ export default function ReviewPage(): React.ReactElement {
                     </Button>
                     <Button
                       variant="outline"
-                      className="flex-1 border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      className="press flex-1 border-2 border-red-300 bg-white font-semibold text-red-600 hover:border-red-500 hover:bg-red-600 hover:text-white"
                       disabled={isActing}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -414,9 +538,10 @@ export default function ReviewPage(): React.ReactElement {
                   </div>
                 </CardContent>
               </Card>
+              </StaggerItem>
             );
           })}
-        </div>
+        </Stagger>
       )}
 
       {toast && (
