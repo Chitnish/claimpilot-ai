@@ -54,10 +54,21 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Display face (Figtree) for headings / hero numerals. */
+  .font-display {
+    font-family:
+      var(--font-display), var(--font-sans), ui-sans-serif, system-ui,
+      sans-serif;
+    letter-spacing: -0.011em;
   }
 }
 
@@ -82,5 +93,162 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: rgba(100, 116, 139, 0.35);
     border-radius: 9999px;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     DESIGN SYSTEM v2 — surfaces, depth, hero treatments, motion
+     Style basis: Soft UI Evolution (layered shadows) + Trust & Authority
+     (depth, metric reveals) + selective OLED dark for ops consoles.
+     ───────────────────────────────────────────────────────────────── */
+
+  /* Premium raised card: layered soft shadow + 1px top sheen for dimension. */
+  .surface-raised {
+    background-color: hsl(var(--card));
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px -12px rgba(15, 23, 42, 0.12),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
+  }
+
+  /* Hover-lift affordance for interactive cards (transform + opacity only). */
+  .card-lift {
+    transition:
+      transform 0.2s ease-out,
+      box-shadow 0.2s ease-out,
+      border-color 0.2s ease-out;
+    will-change: transform;
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 18px 40px -16px rgba(15, 23, 42, 0.22);
+  }
+
+  /* Press feedback for buttons / clickable tiles. */
+  .press {
+    transition: transform 0.12s ease-out;
+  }
+  .press:active {
+    transform: scale(0.98);
+  }
+
+  /* Dark clinical hero: deep gradient + brand radial glows + grid texture. */
+  .mesh-hero {
+    background-color: #0a0f1e;
+    background-image:
+      radial-gradient(
+        120% 120% at 0% 0%,
+        rgba(14, 165, 233, 0.22),
+        transparent 45%
+      ),
+      radial-gradient(
+        100% 120% at 100% 0%,
+        rgba(99, 102, 241, 0.16),
+        transparent 50%
+      ),
+      radial-gradient(
+        90% 140% at 85% 110%,
+        rgba(16, 185, 129, 0.12),
+        transparent 55%
+      ),
+      linear-gradient(160deg, #0d1426 0%, #0a0f1e 100%);
+  }
+
+  /* Faint engineering grid overlay — apply on a positioned ::before host. */
+  .grid-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+    background-size: 38px 38px;
+    -webkit-mask-image: radial-gradient(
+      120% 100% at 50% 0%,
+      black,
+      transparent 75%
+    );
+    mask-image: radial-gradient(120% 100% at 50% 0%, black, transparent 75%);
+    pointer-events: none;
+  }
+
+  /* Brand gradient clip-text for hero numerals / emphasis. */
+  .text-gradient-brand {
+    background-image: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 55%, #6366f1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-gradient-light {
+    background-image: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Soft accent glow placed behind icon chips / stat corners. */
+  .accent-glow {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(28px);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* Status badge pulse — for needs_review / high denial-risk emphasis. */
+  .animate-status-pulse {
+    animation: status-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes status-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 5px rgba(245, 158, 11, 0);
+    }
+  }
+  .animate-status-pulse-danger {
+    animation: status-pulse-danger 2s ease-in-out infinite;
+  }
+  @keyframes status-pulse-danger {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+    }
+    50% {
+      box-shadow: 0 0 0 5px rgba(239, 68, 68, 0);
+    }
+  }
+
+  /* Live indicator sheen for ops-console headers. */
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 2.2s linear infinite;
+  }
+  @keyframes shimmer {
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* Honour reduced-motion: disable decorative loops + entrance transforms. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-status-pulse,
+  .animate-status-pulse-danger,
+  .animate-shimmer {
+    animation: none !important;
+  }
+  .card-lift,
+  .press {
+    transition: none !important;
+  }
+  .card-lift:hover {
+    transform: none;
   }
 }

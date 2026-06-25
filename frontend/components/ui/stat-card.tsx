@@ -11,29 +11,69 @@ export type StatAccent =
   | "purple"
   | "slate";
 
-const ACCENTS: Record<
-  StatAccent,
-  { border: string; chipBg: string; chipText: string }
-> = {
-  blue: { border: "border-l-blue-500", chipBg: "bg-blue-50", chipText: "text-blue-600" },
-  green: {
-    border: "border-l-emerald-500",
-    chipBg: "bg-emerald-50",
-    chipText: "text-emerald-600",
+interface AccentTheme {
+  /** Solid gradient icon chip (white glyph on saturated brand color). */
+  chip: string;
+  /** Colored ambient shadow under the chip. */
+  chipShadow: string;
+  /** Soft glow blob bled into the top-right corner. */
+  glow: string;
+  /** Thin top accent bar gradient. */
+  bar: string;
+  /** Tint for the label marker dot. */
+  dot: string;
+}
+
+const ACCENTS: Record<StatAccent, AccentTheme> = {
+  blue: {
+    chip: "from-sky-500 to-blue-600",
+    chipShadow: "shadow-blue-500/25",
+    glow: "bg-sky-400",
+    bar: "from-sky-500 to-blue-600",
+    dot: "bg-sky-500",
   },
-  amber: { border: "border-l-amber-500", chipBg: "bg-amber-50", chipText: "text-amber-600" },
-  red: { border: "border-l-red-500", chipBg: "bg-red-50", chipText: "text-red-600" },
+  green: {
+    chip: "from-emerald-500 to-teal-600",
+    chipShadow: "shadow-emerald-500/25",
+    glow: "bg-emerald-400",
+    bar: "from-emerald-500 to-teal-600",
+    dot: "bg-emerald-500",
+  },
+  amber: {
+    chip: "from-amber-400 to-orange-500",
+    chipShadow: "shadow-amber-500/25",
+    glow: "bg-amber-400",
+    bar: "from-amber-400 to-orange-500",
+    dot: "bg-amber-500",
+  },
+  red: {
+    chip: "from-red-500 to-rose-600",
+    chipShadow: "shadow-red-500/25",
+    glow: "bg-red-400",
+    bar: "from-red-500 to-rose-600",
+    dot: "bg-red-500",
+  },
   orange: {
-    border: "border-l-orange-500",
-    chipBg: "bg-orange-50",
-    chipText: "text-orange-600",
+    chip: "from-orange-500 to-amber-600",
+    chipShadow: "shadow-orange-500/25",
+    glow: "bg-orange-400",
+    bar: "from-orange-500 to-amber-600",
+    dot: "bg-orange-500",
   },
   purple: {
-    border: "border-l-purple-500",
-    chipBg: "bg-purple-50",
-    chipText: "text-purple-600",
+    chip: "from-violet-500 to-purple-600",
+    chipShadow: "shadow-purple-500/25",
+    glow: "bg-violet-400",
+    bar: "from-violet-500 to-purple-600",
+    dot: "bg-violet-500",
   },
-  slate: { border: "border-l-slate-400", chipBg: "bg-slate-100", chipText: "text-slate-600" },
+  slate: {
+    chip: "from-slate-500 to-slate-700",
+    chipShadow: "shadow-slate-500/20",
+    glow: "bg-slate-400",
+    bar: "from-slate-400 to-slate-600",
+    dot: "bg-slate-500",
+  },
 };
 
 interface StatCardProps {
@@ -42,14 +82,15 @@ interface StatCardProps {
   subtitle?: React.ReactNode;
   icon: React.ComponentType<{ className?: string }>;
   accent?: StatAccent;
-  /** Adds pointer cursor + shadow lift on hover for clickable metrics. */
+  /** Adds pointer cursor + lift on hover for clickable metrics. */
   interactive?: boolean;
   className?: string;
 }
 
 /**
- * Data-dense KPI card: muted label, large bold value, optional context line,
- * a semantic colored left border (4px) and a matching icon chip on the right.
+ * Premium KPI tile: layered raised surface, a saturated gradient icon chip,
+ * a colored accent bar + ambient corner glow, and a large display numeral.
+ * Pass a `<CountUp />` as `value` to animate the figure on reveal.
  */
 export function StatCard({
   label,
@@ -64,29 +105,48 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border border-l-4 bg-card p-5 shadow-card transition-shadow",
-        a.border,
-        interactive && "cursor-pointer hover:shadow-card-hover",
+        "surface-raised group relative overflow-hidden rounded-2xl border border-slate-200/70 p-5",
+        interactive && "card-lift cursor-pointer hover:border-slate-300",
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3">
+      {/* Top accent bar */}
+      <span
+        className={cn(
+          "absolute inset-x-0 top-0 h-1 bg-gradient-to-r opacity-80",
+          a.bar,
+        )}
+        aria-hidden
+      />
+      {/* Ambient corner glow */}
+      <span
+        className={cn("accent-glow -right-6 -top-6 size-24", a.glow)}
+        aria-hidden
+      />
+
+      <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-slate-600">{label}</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <span className={cn("size-1.5 rounded-full", a.dot)} aria-hidden />
+            {label}
+          </p>
+          <p className="mt-2 font-display text-[1.75rem] font-bold leading-none tracking-tight text-slate-900">
             {value}
           </p>
           {subtitle ? (
-            <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              {subtitle}
+            </p>
           ) : null}
         </div>
         <div
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-lg",
-            a.chipBg,
+            "flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg ring-1 ring-white/40 transition-transform duration-200 group-hover:scale-105",
+            a.chip,
+            a.chipShadow,
           )}
         >
-          <Icon className={cn("size-5", a.chipText)} />
+          <Icon className="size-5" />
         </div>
       </div>
     </div>

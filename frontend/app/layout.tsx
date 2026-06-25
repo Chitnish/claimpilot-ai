@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { Geist } from "next/font/google";
+import { Geist, Figtree } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+
+// Display face for headings + hero numerals (skill recommendation).
+const figtree = Figtree({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
+});
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -31,7 +38,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): React.ReactElement {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html
+      lang="en"
+      className={cn("font-sans", geist.variable, figtree.variable)}
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >

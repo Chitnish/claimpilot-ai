@@ -85,6 +85,13 @@ const config: Config = {
           "system-ui",
           "sans-serif",
         ],
+        display: [
+          "var(--font-display)",
+          "var(--font-sans)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: [
           "var(--font-geist-mono)",
           "ui-monospace",
@@ -97,11 +104,28 @@ const config: Config = {
         card: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
         "card-hover":
           "0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04)",
+        // Layered "Soft UI Evolution" elevations for the v2 system.
+        elevated:
+          "0 1px 2px rgba(15,23,42,0.04), 0 10px 30px -12px rgba(15,23,42,0.18)",
+        float: "0 24px 60px -18px rgba(15,23,42,0.28)",
+        "glow-brand":
+          "0 0 0 1px rgba(14,165,233,0.18), 0 12px 32px -10px rgba(14,165,233,0.40)",
       },
       borderRadius: {
+        "2xl": "1rem",
+        xl: "0.875rem",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-up": "fade-up 0.5s ease-out both",
       },
     },
   },
