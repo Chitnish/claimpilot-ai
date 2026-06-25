@@ -254,8 +254,8 @@ export function PipelineDiagram({
   const isLive = activeAgent !== null;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
-      <div className="sidebar-surface flex items-center justify-between border-b border-white/5 px-5 py-3">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-card shadow-elevated">
+      <div className="sidebar-surface flex items-center justify-between border-b border-white/10 px-5 py-3.5">
         <div className="flex items-center gap-2.5">
           <span className="relative flex size-2.5">
             {isLive && (
@@ -267,17 +267,30 @@ export function PipelineDiagram({
               }`}
             />
           </span>
-          <span className="text-sm font-semibold tracking-tight text-white">
-            Live Processing Pipeline
-          </span>
+          <div className="leading-tight">
+            <span className="block font-display text-sm font-semibold tracking-tight text-white">
+              Live Processing Pipeline
+            </span>
+            <span className="block text-[10px] uppercase tracking-wider text-slate-400">
+              Intake → Reconciliation
+            </span>
+          </div>
         </div>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider text-slate-300">
           7 AI Agents
         </span>
       </div>
-      <div className="bg-gradient-to-b from-slate-50/60 to-white p-5 sm:p-6">
+      <div className="relative bg-gradient-to-b from-slate-50 to-white p-5 sm:p-7">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.5]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 50% 0%, rgba(14,165,233,0.06), transparent 60%)",
+          }}
+          aria-hidden
+        />
         {/* Mobile: two rows */}
-        <div className="flex flex-col items-center gap-4 sm:hidden">
+        <div className="relative flex flex-col items-center gap-4 sm:hidden">
           <AgentRow
             agents={firstRow}
             activeAgent={activeAgent}
@@ -293,7 +306,7 @@ export function PipelineDiagram({
         </div>
 
         {/* Desktop: single row */}
-        <div className="hidden sm:flex sm:justify-center">
+        <div className="relative hidden sm:flex sm:justify-center">
           <AgentRow
             agents={AGENTS}
             activeAgent={activeAgent}

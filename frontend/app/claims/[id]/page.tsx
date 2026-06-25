@@ -6,11 +6,14 @@ import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
+  ArrowLeft,
+  Bot,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
+  DollarSign,
   Download,
   Info,
   Link2,
@@ -51,6 +54,7 @@ import { cn } from "@/lib/utils";
 import { PipelineDiagram } from "@/components/pipeline-diagram";
 import { ReviewCopilot } from "@/components/review-copilot";
 import { CorrectClaimPanel } from "@/components/correct-claim-panel";
+import { Reveal } from "@/components/ui/motion";
 
 function formatDisputeTimestamp(value: string): string {
   if (!value) {
@@ -278,24 +282,42 @@ export default function ClaimDetailPage(): React.ReactElement {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Claim{" "}
-            <span className="font-mono text-xl text-slate-700">
-              {truncateId(claim.claimId, 12)}
-            </span>
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Live pipeline activity and claim details
-          </p>
-        </div>
-        <Badge
-          variant="outline"
-          className={cn("text-sm", statusBadgeClass(claim.status))}
+      <div className="mb-6">
+        <Link
+          href="/claims"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-brand"
         >
-          {formatStatus(claim.status)}
-        </Badge>
+          <ArrowLeft className="size-3.5" />
+          Claims
+        </Link>
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Claim Detail
+            </p>
+            <h1 className="mt-1.5 flex flex-wrap items-center gap-2.5 font-display text-2xl font-bold tracking-tight text-slate-900">
+              Claim
+              <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-base font-medium text-slate-700">
+                {truncateId(claim.claimId, 12)}
+              </span>
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {claim.patientName || "—"}
+              {claim.payerName ? ` · ${claim.payerName}` : ""}
+              {claim.dateOfService ? ` · DOS ${claim.dateOfService}` : ""}
+            </p>
+          </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              "px-3 py-1 text-sm",
+              statusBadgeClass(claim.status),
+              claim.status === "needs_review" && "animate-status-pulse",
+            )}
+          >
+            {formatStatus(claim.status)}
+          </Badge>
+        </div>
       </div>
 
       {isDenied && claim.carcCode && (
@@ -367,13 +389,13 @@ export default function ClaimDetailPage(): React.ReactElement {
         </div>
       )}
 
-      <div className="mb-6">
+      <Reveal className="mb-6">
         <PipelineDiagram
           activeAgent={activeAgent}
           completedAgents={completedAgents}
           status={claim.status}
         />
-      </div>
+      </Reveal>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-1">
@@ -483,7 +505,10 @@ export default function ClaimDetailPage(): React.ReactElement {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Financials</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <DollarSign className="size-4 text-emerald-600" />
+                Financials
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -801,15 +826,20 @@ export default function ClaimDetailPage(): React.ReactElement {
           />
         </div>
 
-        <Card className="overflow-hidden lg:col-span-2">
-          <div className="sidebar-surface flex flex-wrap items-center justify-between gap-3 border-b border-white/5 px-5 py-3.5">
-            <div>
-              <h2 className="text-sm font-semibold tracking-tight text-white">
-                Agent Activity
-              </h2>
-              <p className="text-xs text-slate-400">
-                Real-time updates from the ClaimPilot pipeline
-              </p>
+        <Card className="overflow-hidden border-white/10 bg-clinical-shell shadow-float lg:col-span-2">
+          <div className="sidebar-surface flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-white/10">
+                <Bot className="size-4 text-brand" />
+              </span>
+              <div>
+                <h2 className="font-display text-sm font-semibold tracking-tight text-white">
+                  Agent Activity
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Real-time updates from the ClaimPilot pipeline
+                </p>
+              </div>
             </div>
             {isPaused ? (
               <div className="flex items-center gap-2 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-300">
@@ -831,9 +861,12 @@ export default function ClaimDetailPage(): React.ReactElement {
           <CardContent className="pt-4 sm:pt-6">
             <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-1">
               {events.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Waiting for agent events…
-                </p>
+                <div className="flex flex-col items-center gap-2 py-12 text-center">
+                  <Loader2 className="size-5 animate-spin text-slate-500" />
+                  <p className="text-sm text-slate-400">
+                    Waiting for agent events…
+                  </p>
+                </div>
               ) : (
                 events.map((event, index) => (
                   <motion.div
@@ -842,11 +875,11 @@ export default function ClaimDetailPage(): React.ReactElement {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, ease: "easeOut" }}
                     className={cn(
-                      "mb-2 rounded-lg border border-border border-l-[3px] bg-slate-50/70 px-3 py-2.5 last:mb-0",
+                      "mb-2 rounded-lg border border-white/[0.07] border-l-[3px] bg-white/[0.03] px-3 py-2.5 transition-colors last:mb-0 hover:bg-white/[0.06]",
                       agentBorderClass(event.agent),
                     )}
                   >
-                    <div className="mb-0.5 flex flex-wrap items-center justify-between gap-2">
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                       <span
                         className={cn(
                           "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium capitalize",
@@ -855,11 +888,13 @@ export default function ClaimDetailPage(): React.ReactElement {
                       >
                         {event.agent.replace(/_/g, " ")}
                       </span>
-                      <span className="font-mono text-[11px] text-slate-400">
+                      <span className="font-mono text-[11px] text-slate-500">
                         {event.receivedAt.toLocaleTimeString()}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-700">{event.summary}</p>
+                    <p className="text-sm leading-relaxed text-slate-200">
+                      {event.summary}
+                    </p>
                   </motion.div>
                 ))
               )}
@@ -870,10 +905,11 @@ export default function ClaimDetailPage(): React.ReactElement {
       </div>
 
       {claim.claimLines.length > 0 && (
+        <Reveal>
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Stethoscope className="size-4" />
+              <Stethoscope className="size-4 text-brand" />
               Service lines
             </CardTitle>
             <CardDescription>
@@ -1022,13 +1058,15 @@ export default function ClaimDetailPage(): React.ReactElement {
             )}
           </CardContent>
         </Card>
+        </Reveal>
       )}
 
       {claim.scrubFindings.length > 0 && (
+        <Reveal>
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldAlert className="size-4" />
+              <ShieldAlert className="size-4 text-amber-500" />
               Scrub findings
             </CardTitle>
             <CardDescription>
@@ -1075,70 +1113,119 @@ export default function ClaimDetailPage(): React.ReactElement {
             ))}
           </CardContent>
         </Card>
+        </Reveal>
       )}
 
       {claim.disputeThread.length > 0 && (
-        <section className="mt-8">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">
-              Dispute Log
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Email exchange following the appeal letter
-            </p>
-          </div>
-          <Card>
-            <CardContent className="space-y-4 pt-6">
-              {claim.hasPendingDispute && (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  <MessageSquareWarning className="mt-0.5 size-4 shrink-0" />
-                  <p>
-                    This dispute has been flagged for human review.{" "}
-                    <Link
-                      href="/disputes"
-                      className="font-medium underline underline-offset-2"
-                    >
-                      View pending disputes
-                    </Link>
-                  </p>
+        <Reveal>
+          <section className="mt-8">
+            <div className="mb-4">
+              <h2 className="font-display text-xl font-bold tracking-tight text-slate-900">
+                Dispute Log
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Email exchange following the appeal letter
+              </p>
+            </div>
+            <Card className="overflow-hidden">
+              {/* Chat header */}
+              <div className="sidebar-surface flex items-center justify-between border-b border-white/10 px-5 py-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-white/10">
+                    <MessageSquareWarning className="size-4 text-amber-300" />
+                  </span>
+                  <div>
+                    <p className="font-display text-sm font-semibold text-white">
+                      Appeal Correspondence
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {claim.disputeThread.length} message
+                      {claim.disputeThread.length === 1 ? "" : "s"}
+                      {claim.carcCode ? ` · CARC ${claim.carcCode}` : ""}
+                    </p>
+                  </div>
                 </div>
-              )}
-              <div className="space-y-4">
-                {claim.disputeThread.map((msg: DisputeMessage, index: number) => {
-                  const isAi = msg.sender === "ai_reply";
-                  return (
-                    <div
-                      key={`${msg.sender}-${index}`}
-                      className={cn(
-                        "max-w-[75%] rounded-lg p-4 text-sm",
-                        isAi
-                          ? "ml-auto border-l-4 border-blue-500 bg-blue-50"
-                          : "mr-auto bg-slate-100",
-                      )}
-                    >
-                      <p
-                        className={cn(
-                          "mb-1.5 text-xs font-semibold",
-                          isAi ? "text-blue-700" : "text-slate-600",
-                        )}
-                      >
-                        {disputeSenderLabel(msg.sender)}
-                        {msg.createdAt && (
-                          <span className="ml-2 font-normal text-slate-400">
-                            {formatDisputeTimestamp(msg.createdAt)}
-                          </span>
-                        )}
-                      </p>
-                      <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
-                        {msg.messageText}
-                      </p>
-                    </div>
-                  );
-                })}
               </div>
-            </CardContent>
-          </Card>
-        </section>
+              <CardContent className="space-y-4 bg-slate-50/60 pt-6">
+                {claim.hasPendingDispute && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    <MessageSquareWarning className="mt-0.5 size-4 shrink-0" />
+                    <p>
+                      This dispute has been flagged for human review.{" "}
+                      <Link
+                        href="/disputes"
+                        className="font-medium underline underline-offset-2"
+                      >
+                        View pending disputes
+                      </Link>
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-5">
+                  {claim.disputeThread.map(
+                    (msg: DisputeMessage, index: number) => {
+                      const isAi = msg.sender === "ai_reply";
+                      return (
+                        <div
+                          key={`${msg.sender}-${index}`}
+                          className={cn(
+                            "flex items-end gap-2.5",
+                            isAi ? "flex-row-reverse" : "flex-row",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex size-8 shrink-0 items-center justify-center rounded-full shadow-sm ring-1",
+                              isAi
+                                ? "bg-gradient-to-br from-brand to-brand-dark text-white ring-white/30"
+                                : "bg-white text-slate-500 ring-slate-200",
+                            )}
+                          >
+                            {isAi ? (
+                              <Bot className="size-4" />
+                            ) : (
+                              <User className="size-4" />
+                            )}
+                          </span>
+                          <div
+                            className={cn(
+                              "max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm",
+                              isAi
+                                ? "rounded-br-sm bg-gradient-to-br from-brand to-brand-dark text-white"
+                                : "rounded-bl-sm border border-slate-200 bg-white text-slate-700",
+                            )}
+                          >
+                            <p
+                              className={cn(
+                                "mb-1.5 text-xs font-semibold",
+                                isAi ? "text-sky-100" : "text-slate-600",
+                              )}
+                            >
+                              {disputeSenderLabel(msg.sender)}
+                              {msg.createdAt && (
+                                <span
+                                  className={cn(
+                                    "ml-2 font-normal",
+                                    isAi ? "text-sky-200/80" : "text-slate-400",
+                                  )}
+                                >
+                                  {formatDisputeTimestamp(msg.createdAt)}
+                                </span>
+                              )}
+                            </p>
+                            <p className="whitespace-pre-wrap leading-relaxed">
+                              {msg.messageText}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        </Reveal>
       )}
     </div>
   );
