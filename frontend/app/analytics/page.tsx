@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,6 +40,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { CountUp, Reveal, Stagger, StaggerItem } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -52,9 +53,17 @@ import {
 
 const REFRESH_INTERVAL_MS = 30_000;
 const CHART_PRIMARY = "#0ea5e9";
-const DENIAL_RED = "#ef4444";
 
 const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-500";
+
+const usd0 = (n: number): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+const pct = (n: number): string => `${Math.round(n)}%`;
 
 export default function AnalyticsPage(): React.ReactElement {
   const [data, setData] = useState<Analytics | null>(null);
@@ -110,221 +119,279 @@ export default function AnalyticsPage(): React.ReactElement {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+      <Reveal className="mb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Performance Intelligence
+        </p>
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
           Analytics
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Denial patterns, payer performance, and claim volume
         </p>
-      </div>
+      </Reveal>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total Claims"
-          value={data.totalClaims}
-          icon={FileText}
-          accent="blue"
-        />
-        <StatCard
-          label="Total Billed"
-          value={formatCurrency(data.totalBilled)}
-          icon={DollarSign}
-          accent="blue"
-        />
-        <StatCard
-          label="Denial Rate"
-          value={`${Math.round(data.denialRate * 100)}%`}
-          subtitle="of adjudicated claims"
-          icon={TrendingDown}
-          accent="red"
-        />
-        <StatCard
-          label="High-Risk Open Claims"
-          value={data.highRiskOpen}
-          subtitle="≥60% predicted denial risk, not yet submitted"
-          icon={AlertTriangle}
-          accent="amber"
-        />
-      </div>
+      <Stagger className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <StatCard
+            label="Total Claims"
+            value={<CountUp value={data.totalClaims} />}
+            icon={FileText}
+            accent="blue"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Total Billed"
+            value={<CountUp value={data.totalBilled} format={usd0} />}
+            icon={DollarSign}
+            accent="blue"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Denial Rate"
+            value={<CountUp value={Math.round(data.denialRate * 100)} format={pct} />}
+            subtitle="of adjudicated claims"
+            icon={TrendingDown}
+            accent="red"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="High-Risk Open Claims"
+            value={<CountUp value={data.highRiskOpen} />}
+            subtitle="≥60% predicted denial risk, not yet submitted"
+            icon={AlertTriangle}
+            accent="amber"
+          />
+        </StaggerItem>
+      </Stagger>
 
-      <div className="mb-3 flex items-center gap-3 border-t border-border pt-5">
-        <h2 className="text-base font-semibold text-slate-900">
+      <Reveal className="mb-3 flex items-center gap-3 border-t border-border pt-5">
+        <h2 className="font-display text-base font-semibold text-slate-900">
           Operational KPIs
         </h2>
         <span className="text-xs text-muted-foreground">
           measured over {data.adjudicatedCount} adjudicated claims
         </span>
-      </div>
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Clean Claim Rate"
-          value={
-            data.adjudicatedCount > 0
-              ? `${Math.round(data.cleanClaimRate * 100)}%`
-              : "—"
-          }
-          subtitle={
-            data.metricDefinitions.clean_claim_rate ??
-            "First-pass payer acceptance"
-          }
-          icon={ShieldCheck}
-          accent="green"
-        />
-        <StatCard
-          label="Manual-Touch Rate"
-          value={
-            data.adjudicatedCount > 0
-              ? `${Math.round(data.touchRate * 100)}%`
-              : "—"
-          }
-          subtitle="Lower is better — needed human review"
-          icon={Hand}
-          accent="amber"
-        />
-        <StatCard
-          label="Auto-Processed"
-          value={data.autoProcessedCount}
-          subtitle="Touchless, end-to-end"
-          icon={Zap}
-          accent="blue"
-        />
-        <StatCard
-          label="Avg Processing Time"
-          value={formatAvgProcessingSeconds(avgProcessingSeconds)}
-          subtitle="Industry avg: 3–5 days"
-          icon={Clock}
-          accent="slate"
-        />
-      </div>
+      </Reveal>
+      <Stagger className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <StatCard
+            label="Clean Claim Rate"
+            value={
+              data.adjudicatedCount > 0 ? (
+                <CountUp value={Math.round(data.cleanClaimRate * 100)} format={pct} />
+              ) : (
+                "—"
+              )
+            }
+            subtitle={
+              data.metricDefinitions.clean_claim_rate ??
+              "First-pass payer acceptance"
+            }
+            icon={ShieldCheck}
+            accent="green"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Manual-Touch Rate"
+            value={
+              data.adjudicatedCount > 0 ? (
+                <CountUp value={Math.round(data.touchRate * 100)} format={pct} />
+              ) : (
+                "—"
+              )
+            }
+            subtitle="Lower is better — needed human review"
+            icon={Hand}
+            accent="amber"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Auto-Processed"
+            value={<CountUp value={data.autoProcessedCount} />}
+            subtitle="Touchless, end-to-end"
+            icon={Zap}
+            accent="blue"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Avg Processing Time"
+            value={
+              avgProcessingSeconds === null ? (
+                "—"
+              ) : (
+                <CountUp
+                  value={avgProcessingSeconds}
+                  format={formatAvgProcessingSeconds}
+                />
+              )
+            }
+            subtitle="Industry avg: 3–5 days"
+            icon={Clock}
+            accent="slate"
+          />
+        </StaggerItem>
+      </Stagger>
 
-      <h2 className="mb-3 border-t border-border pt-5 text-base font-semibold text-slate-900">
-        Denial &amp; Pipeline Insights
-      </h2>
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base text-slate-900">
-              Top Denial Reasons
-            </CardTitle>
-            <CardDescription>
-              Claim adjustment reason codes (CARC) across denied claims
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {denialData.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No denials recorded
-              </p>
-            ) : (
-              <>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart
-                    data={denialData}
-                    layout="vertical"
-                    margin={{ left: 8, right: 16 }}
-                  >
+      <Reveal>
+        <h2 className="mb-3 border-t border-border pt-5 font-display text-base font-semibold text-slate-900">
+          Denial &amp; Pipeline Insights
+        </h2>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base text-slate-900">
+                Top Denial Reasons
+              </CardTitle>
+              <CardDescription>
+                Claim adjustment reason codes (CARC) across denied claims
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {denialData.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No denials recorded
+                </p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={denialData}
+                      layout="vertical"
+                      margin={{ left: 8, right: 16 }}
+                    >
+                      <defs>
+                        <linearGradient id="denialGrad" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#f87171" />
+                          <stop offset="100%" stopColor="#dc2626" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        horizontal={false}
+                        stroke="#e2e8f0"
+                      />
+                      <XAxis
+                        type="number"
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: "#64748b" }}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="label"
+                        width={72}
+                        tick={{ fontSize: 11, fill: "#64748b" }}
+                      />
+                      <Tooltip
+                        cursor={{ fill: "rgba(239,68,68,0.06)" }}
+                        contentStyle={{
+                          borderRadius: 12,
+                          border: "1px solid #e2e8f0",
+                          fontSize: 12,
+                          boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
+                        }}
+                        formatter={(value) => [value, "Claims"]}
+                        labelFormatter={(label) => {
+                          const entry = denialData.find((d) => d.label === label);
+                          return entry
+                            ? `${entry.label} — ${entry.description}`
+                            : label;
+                        }}
+                      />
+                      <Bar
+                        dataKey="count"
+                        fill="url(#denialGrad)"
+                        radius={[0, 6, 6, 0]}
+                        maxBarSize={28}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-3 space-y-1 border-t border-border pt-3">
+                    {denialData.map((reason) => (
+                      <p
+                        key={reason.label}
+                        className="text-xs text-muted-foreground"
+                      >
+                        <span className="font-mono font-medium text-slate-700">
+                          {reason.label}
+                        </span>{" "}
+                        — {reason.description}
+                      </p>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base text-slate-900">
+                Claims by Status
+              </CardTitle>
+              <CardDescription>Current pipeline distribution</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {statusData.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No data to chart
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={statusData} margin={{ left: 0, right: 8 }}>
+                    <defs>
+                      <linearGradient id="statusGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#38bdf8" />
+                        <stop offset="100%" stopColor="#0284c7" />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      horizontal={false}
+                      vertical={false}
                       stroke="#e2e8f0"
                     />
                     <XAxis
-                      type="number"
+                      dataKey="status"
+                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      interval={0}
+                      angle={-25}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis
                       allowDecimals={false}
                       tick={{ fontSize: 11, fill: "#64748b" }}
                     />
-                    <YAxis
-                      type="category"
-                      dataKey="label"
-                      width={72}
-                      tick={{ fontSize: 11, fill: "#64748b" }}
-                    />
                     <Tooltip
-                      cursor={{ fill: "rgba(239,68,68,0.06)" }}
+                      cursor={{ fill: "rgba(14,165,233,0.06)" }}
                       contentStyle={{
-                        borderRadius: 8,
+                        borderRadius: 12,
                         border: "1px solid #e2e8f0",
                         fontSize: 12,
-                      }}
-                      formatter={(value) => [value, "Claims"]}
-                      labelFormatter={(label) => {
-                        const entry = denialData.find((d) => d.label === label);
-                        return entry
-                          ? `${entry.label} — ${entry.description}`
-                          : label;
+                        boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
                       }}
                     />
-                    <Bar dataKey="count" fill={DENIAL_RED} radius={[0, 4, 4, 0]} />
+                    <Bar
+                      dataKey="count"
+                      fill="url(#statusGrad)"
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={48}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="mt-3 space-y-1 border-t border-border pt-3">
-                  {denialData.map((reason) => (
-                    <p
-                      key={reason.label}
-                      className="text-xs text-muted-foreground"
-                    >
-                      <span className="font-mono font-medium text-slate-700">
-                        {reason.label}
-                      </span>{" "}
-                      — {reason.description}
-                    </p>
-                  ))}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </Reveal>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base text-slate-900">
-              Claims by Status
-            </CardTitle>
-            <CardDescription>Current pipeline distribution</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {statusData.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No data to chart
-              </p>
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={statusData} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#e2e8f0"
-                  />
-                  <XAxis
-                    dataKey="status"
-                    tick={{ fontSize: 11, fill: "#64748b" }}
-                    interval={0}
-                    angle={-25}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(14,165,233,0.06)" }}
-                    contentStyle={{
-                      borderRadius: 8,
-                      border: "1px solid #e2e8f0",
-                      fontSize: 12,
-                    }}
-                  />
-                  <Bar dataKey="count" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
+      <Reveal className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base text-slate-900">
@@ -410,10 +477,16 @@ export default function AnalyticsPage(): React.ReactElement {
               </p>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart
+                <AreaChart
                   data={data.dailyVolume}
                   margin={{ left: 0, right: 8 }}
                 >
+                  <defs>
+                    <linearGradient id="volumeFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -429,25 +502,27 @@ export default function AnalyticsPage(): React.ReactElement {
                   />
                   <Tooltip
                     contentStyle={{
-                      borderRadius: 8,
+                      borderRadius: 12,
                       border: "1px solid #e2e8f0",
                       fontSize: 12,
+                      boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
                     }}
                   />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="claims"
                     stroke={CHART_PRIMARY}
                     strokeWidth={2.5}
+                    fill="url(#volumeFill)"
                     dot={{ fill: CHART_PRIMARY, r: 4 }}
                     activeDot={{ r: 6 }}
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
-      </div>
+      </Reveal>
     </div>
   );
 }
