@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,6 +16,7 @@ import {
 } from "recharts";
 import {
   Activity,
+  ArrowUpRight,
   Clock,
   DollarSign,
   FileText,
@@ -49,6 +51,7 @@ import {
 } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { CountUp, Reveal, Stagger, StaggerItem } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -63,6 +66,16 @@ const POLL_INTERVAL_MS = 10_000;
 const MANUAL_HOURS_PER_CLAIM = 2.5;
 const BILLING_STAFF_HOURLY_RATE = 45;
 const CHART_PRIMARY = "#0ea5e9";
+
+// Whole-dollar formatter for headline figures (cleaner during count-up).
+const usd0 = (n: number): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+const pct = (n: number): string => `${Math.round(n)}%`;
 
 // Tenant label for the hero. Demo placeholder — swap for the real org once
 // multi-tenant org metadata is surfaced to the frontend.
@@ -107,6 +120,29 @@ function denialRiskBucketData(
     bucket,
     count: counts[index],
   }));
+}
+
+/** Glassy metric chip used inside the dark hero cluster. */
+function HeroMetric({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-sm transition-colors hover:bg-white/[0.07]">
+      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
+        <Icon className="size-3.5 text-brand" />
+        {label}
+      </div>
+      <p className="mt-2 font-display text-2xl font-bold tracking-tight text-white">
+        {children}
+      </p>
+    </div>
+  );
 }
 
 export default function DashboardPage(): React.ReactElement {
@@ -174,128 +210,206 @@ export default function DashboardPage(): React.ReactElement {
   const cleanClaimPct = Math.round(analytics.cleanClaimRate * 100);
   const denialPct = Math.round(analytics.denialRate * 100);
   const touchPct = Math.round(analytics.touchRate * 100);
+  const touchlessPct = Math.max(0, 100 - touchPct);
   const totalClaims = claims.length;
   const avgProcessingSeconds = getAvgProcessingSeconds(totalClaims);
   const fteHoursSaved = totalClaims * MANUAL_HOURS_PER_CLAIM;
   const costSavings = fteHoursSaved * BILLING_STAFF_HOURLY_RATE;
 
   return (
-    <div className="p-6 lg:p-8">
+    <div className="space-y-6 p-6 lg:p-8">
       {/* Hero banner */}
-      <div className="mb-6 overflow-hidden rounded-xl bg-gradient-to-br from-clinical-shell to-clinical-sidebar p-6 text-white shadow-card sm:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-brand-dark shadow-md shadow-brand/20">
-                <Activity className="size-5 text-white" />
-              </span>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                ClaimPilot AI
-              </h1>
+      <Reveal>
+        <section className="mesh-hero grid-overlay relative overflow-hidden rounded-2xl border border-white/10 p-6 text-white shadow-float sm:p-8">
+          <span className="accent-glow -right-10 -top-10 size-56 bg-brand/40" aria-hidden />
+          <div className="relative">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark shadow-lg shadow-brand/30 ring-1 ring-white/20">
+                    <Activity className="size-[18px] text-white" />
+                  </span>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                    Revenue Cycle Command Center
+                  </span>
+                </div>
+                <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                  {ORG_NAME}
+                </h1>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
+                  Real-time claims automation across seven specialized AI
+                  agents — from intake through reconciliation.
+                </p>
+              </div>
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+                  </span>
+                  Pipeline live
+                </span>
+                <p className="text-xs text-slate-400">{today}</p>
+              </div>
             </div>
-            <p className="mt-2 text-sm text-slate-300">
-              Revenue Cycle Management Platform
-            </p>
-          </div>
-          <div className="text-left sm:text-right">
-            <p className="text-sm font-semibold text-white">{ORG_NAME}</p>
-            <p className="mt-0.5 text-xs text-slate-400">{today}</p>
-          </div>
-        </div>
-      </div>
 
-      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+            <div className="mt-7 grid max-w-2xl gap-3 sm:grid-cols-3">
+              <HeroMetric icon={ShieldCheck} label="Clean claim rate">
+                {analytics.adjudicatedCount > 0 ? (
+                  <CountUp value={cleanClaimPct} format={pct} />
+                ) : (
+                  "—"
+                )}
+              </HeroMetric>
+              <HeroMetric icon={Zap} label="Touchless">
+                {analytics.adjudicatedCount > 0 ? (
+                  <CountUp value={touchlessPct} format={pct} />
+                ) : (
+                  "—"
+                )}
+              </HeroMetric>
+              <HeroMetric icon={DollarSign} label="Total billed">
+                <CountUp value={analytics.totalBilled} format={usd0} />
+              </HeroMetric>
+            </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {/* KPI stat cards */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Claims Processed"
-          value={analytics.totalClaims}
-          subtitle={`${analytics.adjudicatedCount} submitted to payers`}
-          icon={FileText}
-          accent="blue"
-        />
-        <StatCard
-          label="Clean Claim Rate"
-          value={analytics.adjudicatedCount > 0 ? `${cleanClaimPct}%` : "—"}
-          subtitle={`First-pass acceptance, of ${analytics.adjudicatedCount} adjudicated`}
-          icon={ShieldCheck}
-          accent="green"
-        />
-        <StatCard
-          label="Avg Processing Time"
-          value={formatAvgProcessingSeconds(avgProcessingSeconds)}
-          subtitle="Industry avg: 3–5 days"
-          icon={Zap}
-          accent="amber"
-        />
-        <StatCard
-          label="Total Billed"
-          value={formatCurrency(analytics.totalBilled)}
-          subtitle="Across all claims"
-          icon={DollarSign}
-          accent="blue"
-        />
-      </div>
+      <Stagger className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <StatCard
+            label="Claims Processed"
+            value={<CountUp value={analytics.totalClaims} />}
+            subtitle={`${analytics.adjudicatedCount} submitted to payers`}
+            icon={FileText}
+            accent="blue"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Clean Claim Rate"
+            value={
+              analytics.adjudicatedCount > 0 ? (
+                <CountUp value={cleanClaimPct} format={pct} />
+              ) : (
+                "—"
+              )
+            }
+            subtitle={`First-pass acceptance, of ${analytics.adjudicatedCount} adjudicated`}
+            icon={ShieldCheck}
+            accent="green"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Avg Processing Time"
+            value={
+              avgProcessingSeconds === null ? (
+                "—"
+              ) : (
+                <CountUp
+                  value={avgProcessingSeconds}
+                  format={formatAvgProcessingSeconds}
+                />
+              )
+            }
+            subtitle="Industry avg: 3–5 days"
+            icon={Zap}
+            accent="amber"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Total Billed"
+            value={<CountUp value={analytics.totalBilled} format={usd0} />}
+            subtitle="Across all claims"
+            icon={DollarSign}
+            accent="blue"
+          />
+        </StaggerItem>
+      </Stagger>
 
-      {/* Business impact (dark) */}
-      <div className="mb-6 rounded-xl bg-gradient-to-br from-clinical-sidebar to-clinical-shell p-6 text-white shadow-card sm:p-8">
-        <h2 className="text-base font-semibold text-white">
-          Estimated Business Impact
-        </h2>
-        <p className="mt-0.5 text-xs text-slate-400">
-          Modeled savings from automated claim processing
-        </p>
-        <div className="mt-5 grid gap-6 sm:grid-cols-3">
-          <div className="flex items-start gap-4">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
-              <Clock className="size-5 text-blue-300" />
+      {/* Business impact (dark, dramatic) */}
+      <Reveal>
+        <section className="mesh-hero grid-overlay relative overflow-hidden rounded-2xl border border-white/10 p-6 text-white shadow-float sm:p-8">
+          <span className="accent-glow -bottom-12 left-1/3 size-72 bg-emerald-500/25" aria-hidden />
+          <div className="relative">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/15 ring-1 ring-emerald-400/30">
+                <TrendingDown className="size-4 text-emerald-300" />
+              </span>
+              <div>
+                <h2 className="font-display text-base font-semibold text-white">
+                  Estimated Business Impact
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Modeled savings from automated claim processing
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-slate-400">FTE Hours Saved</p>
-              <p className="mt-0.5 text-2xl font-bold tracking-tight text-white">
-                {fteHoursSaved.toFixed(1)} hrs
-              </p>
-              <p className="mt-0.5 text-xs text-slate-400">
-                At $45/hr avg billing staff cost
-              </p>
+
+            <div className="mt-6 grid gap-6 sm:grid-cols-3">
+              {/* Cost savings — the headline figure */}
+              <div className="sm:border-r sm:border-white/10 sm:pr-6">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <DollarSign className="size-4 text-emerald-300" />
+                  Cost Savings
+                </div>
+                <p className="mt-1 font-display text-4xl font-bold tracking-tight">
+                  <span className="text-gradient-brand">
+                    <CountUp value={costSavings} format={usd0} />
+                  </span>
+                </p>
+                <p className="mt-1 text-xs text-slate-400">vs manual processing</p>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 ring-1 ring-blue-400/20">
+                  <Clock className="size-5 text-blue-300" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">FTE Hours Saved</p>
+                  <p className="mt-0.5 font-display text-2xl font-bold tracking-tight text-white">
+                    <CountUp
+                      value={fteHoursSaved}
+                      format={(n) => `${n.toFixed(1)} hrs`}
+                    />
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    At $45/hr avg billing staff cost
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 ring-1 ring-amber-400/20">
+                  <TrendingDown className="size-5 text-amber-300" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Denial Rate</p>
+                  <p className="mt-0.5 font-display text-2xl font-bold tracking-tight text-white">
+                    {analytics.adjudicatedCount > 0 ? (
+                      <CountUp value={denialPct} format={pct} />
+                    ) : (
+                      "—"
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {touchPct}% of claims needed review
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-
-          <div className="flex items-start gap-4">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15">
-              <DollarSign className="size-5 text-emerald-300" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-400">Cost Savings</p>
-              <p className="mt-0.5 text-2xl font-bold tracking-tight text-white">
-                {formatCurrency(costSavings)}
-              </p>
-              <p className="mt-0.5 text-xs text-slate-400">
-                vs manual processing
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
-              <TrendingDown className="size-5 text-amber-300" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-400">Denial Rate</p>
-              <p className="mt-0.5 text-2xl font-bold tracking-tight text-white">
-                {analytics.adjudicatedCount > 0 ? `${denialPct}%` : "—"}
-              </p>
-              <p className="mt-0.5 text-xs text-slate-400">
-                {touchPct}% of claims needed review
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+        </section>
+      </Reveal>
 
       {/* Charts */}
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
+      <Reveal className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base text-slate-900">
@@ -313,6 +427,12 @@ export default function DashboardPage(): React.ReactElement {
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={statusData} margin={{ left: 0, right: 8 }}>
+                  <defs>
+                    <linearGradient id="barBrand" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#0284c7" />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
@@ -333,15 +453,17 @@ export default function DashboardPage(): React.ReactElement {
                   <Tooltip
                     cursor={{ fill: "rgba(14,165,233,0.06)" }}
                     contentStyle={{
-                      borderRadius: 8,
+                      borderRadius: 12,
                       border: "1px solid #e2e8f0",
                       fontSize: 12,
+                      boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
                     }}
                   />
                   <Bar
                     dataKey="count"
-                    fill={CHART_PRIMARY}
-                    radius={[4, 4, 0, 0]}
+                    fill="url(#barBrand)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={56}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -365,10 +487,10 @@ export default function DashboardPage(): React.ReactElement {
               </p>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={riskBucketData} margin={{ left: 0, right: 8 }}>
+                <AreaChart data={riskBucketData} margin={{ left: 0, right: 8 }}>
                   <defs>
                     <linearGradient
-                      id="riskLineGradient"
+                      id="riskStroke"
                       x1="0"
                       y1="0"
                       x2="1"
@@ -377,6 +499,10 @@ export default function DashboardPage(): React.ReactElement {
                       <stop offset="0%" stopColor="#22c55e" />
                       <stop offset="50%" stopColor="#f59e0b" />
                       <stop offset="100%" stopColor="#ef4444" />
+                    </linearGradient>
+                    <linearGradient id="riskFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.22} />
+                      <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -395,33 +521,46 @@ export default function DashboardPage(): React.ReactElement {
                   />
                   <Tooltip
                     contentStyle={{
-                      borderRadius: 8,
+                      borderRadius: 12,
                       border: "1px solid #e2e8f0",
                       fontSize: 12,
+                      boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
                     }}
                   />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="count"
-                    stroke="url(#riskLineGradient)"
+                    stroke="url(#riskStroke)"
                     strokeWidth={2.5}
+                    fill="url(#riskFill)"
                     dot={{ fill: CHART_PRIMARY, r: 4 }}
                     activeDot={{ r: 6 }}
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
-      </div>
+      </Reveal>
 
       {/* Recent claims */}
+      <Reveal>
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base text-slate-900">
-            Recent Claims
-          </CardTitle>
-          <CardDescription>Click a row to view claim details</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+              <FileText className="size-4 text-brand" />
+              Recent Claims
+            </CardTitle>
+            <CardDescription>Click a row to view claim details</CardDescription>
+          </div>
+          <Link
+            href="/claims"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-brand/40 hover:text-brand"
+          >
+            View all
+            <ArrowUpRight className="size-3.5" />
+          </Link>
         </CardHeader>
         <CardContent>
           {claims.length === 0 ? (
@@ -468,7 +607,11 @@ export default function DashboardPage(): React.ReactElement {
                           {claim.status ? (
                             <Badge
                               variant="outline"
-                              className={statusBadgeClass(claim.status)}
+                              className={cn(
+                                statusBadgeClass(claim.status),
+                                claim.status === "needs_review" &&
+                                  "animate-status-pulse",
+                              )}
                             >
                               {formatStatus(claim.status)}
                             </Badge>
@@ -512,6 +655,7 @@ export default function DashboardPage(): React.ReactElement {
           )}
         </CardContent>
       </Card>
+      </Reveal>
     </div>
   );
 }
