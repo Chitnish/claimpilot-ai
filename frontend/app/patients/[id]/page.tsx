@@ -1,20 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Calendar,
   ChevronDown,
   CreditCard,
+  DollarSign,
   Edit,
   File,
   FileText,
   FlaskConical,
   Loader2,
+  Receipt,
   Save,
   ScanLine,
   Share2,
+  ShieldCheck,
   Upload,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -55,6 +61,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { StatCard } from "@/components/ui/stat-card";
+import { CountUp, Reveal, Stagger, StaggerItem } from "@/components/ui/motion";
 import {
   Table,
   TableBody,
@@ -64,6 +72,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+
+const usd0 = (n: number): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 const inputClass =
   "h-9 w-full rounded-md border border-input bg-white px-3 text-sm shadow-sm " +
@@ -278,60 +293,135 @@ export default function PatientDetailPage(): React.ReactElement {
         </p>
       )}
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            {fullName}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Member ID{" "}
-            <span className="font-mono text-slate-700">
-              {displayText(p.memberId)}
-            </span>{" "}
-            · {displayText(p.payerName)}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {editing ? (
-            <>
+      <Reveal className="mb-6">
+        <Link
+          href="/patients"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-brand"
+        >
+          <ArrowLeft className="size-3.5" />
+          Patients
+        </Link>
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 font-display text-xl font-bold text-white shadow-lg shadow-blue-500/25 ring-1 ring-white/30">
+              {(p.lastName || p.firstName || "?").charAt(0).toUpperCase()}
+            </span>
+            <div>
+              <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
+                {fullName}
+              </h1>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+                <span>
+                  Member ID{" "}
+                  <span className="font-mono text-slate-700">
+                    {displayText(p.memberId)}
+                  </span>
+                </span>
+                <span className="text-slate-300">·</span>
+                <span>{displayText(p.payerName)}</span>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                    detail.stats.activeInsurance
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-slate-100 text-slate-600",
+                  )}
+                >
+                  <ShieldCheck className="size-3" />
+                  {detail.stats.activeInsurance ? "Active" : "Inactive"}
+                </span>
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {editing ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDraft(detail.patient);
+                    setEditing(false);
+                  }}
+                >
+                  <X className="mr-1 size-4" />
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  disabled={saving}
+                  onClick={() => void handleSave()}
+                >
+                  {saving ? (
+                    <Loader2 className="mr-1 size-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-1 size-4" />
+                  )}
+                  Save
+                </Button>
+              </>
+            ) : (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setDraft(detail.patient);
-                  setEditing(false);
-                }}
+                onClick={() => setEditing(true)}
               >
-                <X className="mr-1 size-4" />
-                Cancel
+                <Edit className="mr-1 size-4" />
+                Edit
               </Button>
-              <Button
-                size="sm"
-                className="bg-brand text-white hover:bg-brand-dark"
-                disabled={saving}
-                onClick={() => void handleSave()}
-              >
-                {saving ? (
-                  <Loader2 className="mr-1 size-4 animate-spin" />
-                ) : (
-                  <Save className="mr-1 size-4" />
-                )}
-                Save
-              </Button>
-            </>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              <Edit className="mr-1 size-4" />
-              Edit
-            </Button>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </Reveal>
+
+      {/* Patient summary stats */}
+      <Stagger className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <StatCard
+            label="Total Claims"
+            value={<CountUp value={detail.stats.totalClaims} />}
+            icon={FileText}
+            accent="blue"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Total Billed"
+            value={<CountUp value={detail.stats.totalBilled} format={usd0} />}
+            icon={DollarSign}
+            accent="green"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Patient Responsibility"
+            value={
+              <CountUp
+                value={detail.stats.totalPatientResponsibility}
+                format={usd0}
+              />
+            }
+            icon={Receipt}
+            accent="amber"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Insurance"
+            value={detail.stats.activeInsurance ? "Active" : "Inactive"}
+            subtitle={displayText(p.payerName)}
+            icon={ShieldCheck}
+            accent={detail.stats.activeInsurance ? "green" : "slate"}
+          />
+        </StaggerItem>
+      </Stagger>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-slate-900">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+              <Users className="size-4 text-brand" />
               Demographics
             </CardTitle>
           </CardHeader>
@@ -422,11 +512,14 @@ export default function PatientDetailPage(): React.ReactElement {
             </CardContent>
           </Card>
         ) : (
-          <div className="sidebar-surface relative overflow-hidden rounded-xl border border-white/10 p-6 text-white shadow-card">
-            <div className="flex items-start justify-between">
-              <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                <CreditCard className="size-4" />
-                Insurance
+          <div className="mesh-hero grid-overlay relative overflow-hidden rounded-2xl border border-white/10 p-6 text-white shadow-float">
+            <span className="accent-glow -right-8 -top-8 size-40 bg-brand/40" aria-hidden />
+            <div className="relative flex items-start justify-between">
+              <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                <span className="flex size-7 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
+                  <CreditCard className="size-4" />
+                </span>
+                Member Card
               </span>
               <span
                 className={cn(
@@ -439,14 +532,16 @@ export default function PatientDetailPage(): React.ReactElement {
                 {detail.stats.activeInsurance ? "Active" : "Inactive"}
               </span>
             </div>
-            <p className="mt-4 text-xl font-semibold tracking-tight text-white">
+            <p className="relative mt-4 font-display text-xl font-semibold tracking-tight text-white">
               {displayText(p.insurancePlanName) === "—"
                 ? displayText(p.payerName)
                 : p.insurancePlanName}
             </p>
-            <p className="text-sm text-slate-300">{displayText(p.payerName)}</p>
+            <p className="relative text-sm text-slate-300">
+              {displayText(p.payerName)}
+            </p>
 
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+            <div className="relative mt-5 grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-slate-400">
                   Member ID
@@ -494,7 +589,7 @@ export default function PatientDetailPage(): React.ReactElement {
             </div>
 
             {p.secondaryPayerName && (
-              <div className="mt-5 border-t border-white/10 pt-4 text-sm">
+              <div className="relative mt-5 border-t border-white/10 pt-4 text-sm">
                 <p className="text-[11px] uppercase tracking-wide text-slate-400">
                   Secondary Coverage
                 </p>
@@ -514,7 +609,10 @@ export default function PatientDetailPage(): React.ReactElement {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-base text-slate-900">Contacts</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <Users className="size-4 text-brand" />
+            Contacts
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
           <div>
@@ -623,13 +721,13 @@ export default function PatientDetailPage(): React.ReactElement {
                 return (
                   <div
                     key={appt.id}
-                    className="flex items-center gap-4 rounded-lg border border-border p-3"
+                    className="flex items-center gap-4 rounded-xl border border-slate-200 p-3 transition-colors hover:border-brand/30 hover:bg-slate-50"
                   >
-                    <div className="flex w-14 shrink-0 flex-col items-center rounded-lg bg-sky-50 py-2 text-center">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-brand-dark">
+                    <div className="flex w-14 shrink-0 flex-col items-center rounded-xl bg-gradient-to-br from-brand to-brand-dark py-2 text-center text-white shadow-sm shadow-brand/25 ring-1 ring-white/20">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-100">
                         {month}
                       </span>
-                      <span className="text-xl font-bold leading-none text-slate-900">
+                      <span className="font-display text-xl font-bold leading-none">
                         {day}
                       </span>
                     </div>
@@ -734,9 +832,14 @@ export default function PatientDetailPage(): React.ReactElement {
                 return (
                   <div
                     key={doc.id}
-                    className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-slate-50"
+                    className="group flex items-center gap-3 rounded-xl border border-slate-200 p-3 transition-all hover:border-brand/30 hover:shadow-sm"
                   >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                    <span
+                      className={cn(
+                        "flex size-10 shrink-0 items-center justify-center rounded-xl border",
+                        documentTypeBadge(doc.documentType),
+                      )}
+                    >
                       <DocIcon className="size-5" />
                     </span>
                     <div className="min-w-0 flex-1">
@@ -758,7 +861,7 @@ export default function PatientDetailPage(): React.ReactElement {
                         href={doc.downloadUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="shrink-0 text-sm font-medium text-brand hover:underline"
+                        className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:border-brand/40 hover:text-brand"
                       >
                         Download
                       </a>
@@ -773,7 +876,8 @@ export default function PatientDetailPage(): React.ReactElement {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-base text-slate-900">
+          <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <FileText className="size-4 text-brand" />
             Claims History
           </CardTitle>
           <CardDescription>
@@ -806,16 +910,22 @@ export default function PatientDetailPage(): React.ReactElement {
                     return (
                       <TableRow
                         key={claim.claimId}
-                        className="cursor-pointer odd:bg-white even:bg-slate-50/50 hover:bg-blue-50/50"
+                        className="group cursor-pointer odd:bg-white even:bg-slate-50/50 hover:bg-brand/[0.05]"
                         onClick={() => router.push(`/claims/${claim.claimId}`)}
                       >
-                        <TableCell className="font-mono text-xs text-slate-700">
-                          {truncateId(claim.claimId)}
+                        <TableCell>
+                          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-700 transition-colors group-hover:border-brand/30 group-hover:text-brand-dark">
+                            {truncateId(claim.claimId)}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={statusBadgeClass(claim.status)}
+                            className={cn(
+                              statusBadgeClass(claim.status),
+                              claim.status === "needs_review" &&
+                                "animate-status-pulse",
+                            )}
                           >
                             {formatStatus(claim.status)}
                           </Badge>
@@ -825,7 +935,7 @@ export default function PatientDetailPage(): React.ReactElement {
                         </TableCell>
                         <TableCell className="w-40">
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-full rounded-full bg-slate-200">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
                               <div
                                 className={cn(
                                   "h-2 rounded-full",
