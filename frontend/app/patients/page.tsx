@@ -17,18 +17,20 @@ import type { PatientListItem } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Reveal, Stagger, StaggerItem } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 15;
 const SEARCH_DEBOUNCE_MS = 350;
 
+// Saturated gradient avatars (white monogram) for a crafted directory feel.
 const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-purple-100 text-purple-700",
-  "bg-amber-100 text-amber-700",
-  "bg-cyan-100 text-cyan-700",
-  "bg-rose-100 text-rose-700",
+  "bg-gradient-to-br from-sky-500 to-blue-600 shadow-blue-500/25",
+  "bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/25",
+  "bg-gradient-to-br from-violet-500 to-purple-600 shadow-purple-500/25",
+  "bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/25",
+  "bg-gradient-to-br from-cyan-500 to-sky-600 shadow-cyan-500/25",
+  "bg-gradient-to-br from-rose-500 to-pink-600 shadow-rose-500/25",
 ] as const;
 
 function avatarColor(seed: string): string {
@@ -82,26 +84,30 @@ export default function PatientsPage(): React.ReactElement {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+      <Reveal className="mb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Directory
+        </p>
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
           Patients
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Patient directory with demographics, insurance, and claims history
+          {total > 0 ? ` · ${total} on file` : ""}
         </p>
-      </div>
+      </Reveal>
 
       {/* Search */}
-      <div className="relative mb-6 max-w-xl">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+      <Reveal className="group relative mb-6 max-w-xl">
+        <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-brand" />
         <input
           type="search"
           placeholder="Search by name, member ID, payer, or phone…"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          className="h-11 w-full rounded-lg border border-input bg-white pl-11 pr-3 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand/40"
+          className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-brand/40 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand/10"
         />
-      </div>
+      </Reveal>
 
       {loading && patients.length === 0 ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -118,7 +124,7 @@ export default function PatientsPage(): React.ReactElement {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Stagger className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {patients.map((patient) => {
               const name = patientFullName(
                 patient.firstName,
@@ -132,67 +138,76 @@ export default function PatientsPage(): React.ReactElement {
                 .charAt(0)
                 .toUpperCase();
               return (
-                <Card
-                  key={patient.id}
-                  className="flex cursor-pointer flex-col p-5 transition-shadow hover:shadow-card-hover"
-                  onClick={() => router.push(`/patients/${patient.id}`)}
-                >
-                  <div className="flex items-start gap-3">
+                <StaggerItem key={patient.id} className="h-full">
+                  <Card
+                    className="card-lift group relative flex h-full cursor-pointer flex-col overflow-hidden p-5"
+                    onClick={() => router.push(`/patients/${patient.id}`)}
+                  >
                     <span
-                      className={cn(
-                        "flex size-12 shrink-0 items-center justify-center rounded-full text-lg font-semibold",
-                        avatarColor(initial),
-                      )}
-                    >
-                      {initial}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-slate-900">
-                        {name}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        DOB {formatDate(patient.dob)}
-                      </p>
-                      <p className="font-mono text-xs text-slate-500">
-                        {displayText(patient.memberId)}
-                      </p>
+                      className="absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r from-brand to-brand-dark transition-transform duration-300 group-hover:scale-x-100"
+                      aria-hidden
+                    />
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={cn(
+                          "flex size-12 shrink-0 items-center justify-center rounded-2xl text-lg font-semibold text-white shadow-lg ring-1 ring-white/30 transition-transform duration-200 group-hover:scale-105",
+                          avatarColor(initial),
+                        )}
+                      >
+                        {initial}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-display font-semibold text-slate-900">
+                          {name}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          DOB {formatDate(patient.dob)}
+                        </p>
+                        <p className="font-mono text-xs text-slate-500">
+                          {displayText(patient.memberId)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-3">
-                    <Badge
-                      variant="outline"
-                      className="bg-blue-100 text-blue-800 border-blue-200"
-                    >
-                      {displayText(patient.payerName)}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
-                    <div>
-                      <p className="text-xs text-slate-500">Total claims</p>
-                      <p className="text-lg font-bold tabular-nums text-slate-900">
-                        {patient.totalClaims}
-                      </p>
+                    <div className="mt-3">
+                      <Badge
+                        variant="outline"
+                        className="border-blue-200 bg-blue-100 text-blue-800"
+                      >
+                        {displayText(patient.payerName)}
+                      </Badge>
                     </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Total billed</p>
-                      <p className="text-lg font-bold tabular-nums text-slate-900">
-                        {formatCurrency(patient.totalBilled)}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="mt-4 flex items-center justify-end">
-                    <span className="inline-flex items-center gap-1 text-sm font-medium text-brand">
-                      View Profile
-                      <ChevronRight className="size-4" />
-                    </span>
-                  </div>
-                </Card>
+                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                          Total claims
+                        </p>
+                        <p className="font-display text-lg font-bold tabular-nums text-slate-900">
+                          {patient.totalClaims}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                          Total billed
+                        </p>
+                        <p className="font-display text-lg font-bold tabular-nums text-slate-900">
+                          {formatCurrency(patient.totalBilled)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-end">
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-brand">
+                        View Profile
+                        <ChevronRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                      </span>
+                    </div>
+                  </Card>
+                </StaggerItem>
               );
             })}
-          </div>
+          </Stagger>
 
           <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
             <span>
