@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Reveal } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -115,26 +116,30 @@ export default function ClaimsWorkListPage(): React.ReactElement {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+      <Reveal className="mb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Work List
+        </p>
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
           Claims
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Search, filter, and work the full claims list
         </p>
-      </div>
+      </Reveal>
 
+      <Reveal>
       <Card>
         <CardContent className="pt-6">
           {/* Search */}
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <div className="group relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-brand" />
             <input
               type="search"
               placeholder="Search by patient name, claim ID, or payer…"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="h-11 w-full rounded-lg border border-input bg-white pl-11 pr-3 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand/40"
+              className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-brand/40 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand/10"
             />
           </div>
 
@@ -246,20 +251,26 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                     return (
                       <TableRow
                         key={claim.claimId}
-                        className="cursor-pointer odd:bg-white even:bg-slate-50/50 hover:bg-blue-50/50"
+                        className="group cursor-pointer odd:bg-white even:bg-slate-50/50 hover:bg-brand/[0.05]"
                         onClick={() => {
                           if (claim.claimId) {
                             router.push(`/claims/${claim.claimId}`);
                           }
                         }}
                       >
-                        <TableCell className="font-mono text-xs text-slate-700">
-                          {truncateId(claim.claimId)}
+                        <TableCell>
+                          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-700 transition-colors group-hover:border-brand/30 group-hover:text-brand-dark">
+                            {truncateId(claim.claimId)}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={statusBadgeClass(claim.status)}
+                            className={cn(
+                              statusBadgeClass(claim.status),
+                              claim.status === "needs_review" &&
+                                "animate-status-pulse",
+                            )}
                           >
                             {formatStatus(claim.status)}
                           </Badge>
@@ -275,7 +286,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                         </TableCell>
                         <TableCell className="w-40">
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-full rounded-full bg-slate-200">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
                               <div
                                 className={cn(
                                   "h-2 rounded-full transition-all",
@@ -284,7 +295,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                                 style={{ width: `${riskPercent}%` }}
                               />
                             </div>
-                            <span className="w-9 text-right text-xs tabular-nums text-slate-500">
+                            <span className="w-9 text-right text-xs font-medium tabular-nums text-slate-600">
                               {riskPercent}%
                             </span>
                           </div>
@@ -332,6 +343,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
           </div>
         </CardContent>
       </Card>
+      </Reveal>
     </div>
   );
 }
