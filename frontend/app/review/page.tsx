@@ -47,18 +47,18 @@ function getReasonBadgeStyle(reason: string): ReasonBadgeStyle {
   const lower = reason.toLowerCase();
   if (lower.includes("denial risk")) {
     return {
-      className: "border-amber-200 bg-amber-100 text-amber-800",
+      className: "border-amber-500/25 bg-amber-500/15 text-amber-300",
       icon: AlertTriangle,
     };
   }
   if (lower.includes("low confidence")) {
     return {
-      className: "border-blue-200 bg-blue-100 text-blue-800",
+      className: "border-blue-500/25 bg-blue-500/15 text-blue-300",
       icon: Eye,
     };
   }
   return {
-    className: "border-slate-200 bg-slate-100 text-slate-600",
+    className: "border-white/10 bg-white/[0.06] text-slate-300",
     icon: null,
   };
 }
@@ -82,9 +82,9 @@ function riskTier(pct: number): RiskTier {
     return {
       label: "High denial risk",
       bar: "from-red-500 to-rose-600",
-      panel: "border-red-200 bg-red-50",
+      panel: "border-red-500/25 bg-red-500/10",
       meter: "bg-gradient-to-r from-red-500 to-rose-600",
-      chip: "bg-red-100 text-red-700",
+      chip: "bg-red-500/15 text-red-300",
       alarm: true,
     };
   }
@@ -92,18 +92,18 @@ function riskTier(pct: number): RiskTier {
     return {
       label: "Elevated denial risk",
       bar: "from-amber-400 to-orange-500",
-      panel: "border-amber-200 bg-amber-50/70",
+      panel: "border-amber-500/25 bg-amber-500/10",
       meter: "bg-gradient-to-r from-amber-400 to-orange-500",
-      chip: "bg-amber-100 text-amber-700",
+      chip: "bg-amber-500/15 text-amber-300",
       alarm: false,
     };
   }
   return {
     label: "Low denial risk",
     bar: "from-emerald-400 to-teal-500",
-    panel: "border-slate-200 bg-slate-50",
+    panel: "border-white/10 bg-white/[0.03]",
     meter: "bg-gradient-to-r from-emerald-400 to-teal-500",
-    chip: "bg-emerald-100 text-emerald-700",
+    chip: "bg-emerald-500/15 text-emerald-300",
     alarm: false,
   };
 }
@@ -243,13 +243,13 @@ export default function ReviewPage(): React.ReactElement {
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-white">
               Review Queue
             </h1>
             <Badge
               variant="outline"
               className={cn(
-                "border-amber-200 bg-amber-100 text-amber-800",
+                "border-amber-500/25 bg-amber-500/15 text-amber-300",
                 items.length > 0 && "animate-status-pulse",
               )}
             >
@@ -405,19 +405,19 @@ export default function ReviewPage(): React.ReactElement {
                         className="mt-1 size-4 cursor-pointer rounded border-input accent-brand"
                       />
                       <div className="min-w-0">
-                        <CardTitle className="text-base text-slate-900">
+                        <CardTitle className="text-base text-white">
                           {item.patientName.trim() || "Unknown Patient"}
                         </CardTitle>
-                        <p className="mt-0.5 font-mono text-xs text-slate-500">
+                        <p className="mt-0.5 font-mono text-xs text-slate-400">
                           {truncateId(item.claimId, 8)}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">
                         Total charge
                       </p>
-                      <p className="font-display text-xl font-bold tabular-nums text-slate-900">
+                      <p className="font-display text-xl font-bold tabular-nums text-white">
                         {formatCurrency(item.totalCharge)}
                       </p>
                     </div>
@@ -427,7 +427,7 @@ export default function ReviewPage(): React.ReactElement {
                   {/* Denial-risk triage panel */}
                   <div className={cn("rounded-xl border p-3.5", tier.panel)}>
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-slate-300">
                         {tier.alarm && (
                           <ShieldAlert className="size-4 text-red-500" />
                         )}
@@ -443,7 +443,7 @@ export default function ReviewPage(): React.ReactElement {
                         {riskPercent}%
                       </span>
                     </div>
-                    <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
                       <div
                         className={cn("h-2.5 rounded-full", tier.meter)}
                         style={{ width: `${riskPercent}%` }}
@@ -456,7 +456,7 @@ export default function ReviewPage(): React.ReactElement {
                       </Badge>
                     </div>
                     {tier.alarm && (
-                      <p className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-red-700">
+                      <p className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-red-300">
                         <AlertTriangle className="size-3.5 shrink-0" />
                         High denial risk — review carefully before approving.
                       </p>
@@ -465,17 +465,17 @@ export default function ReviewPage(): React.ReactElement {
 
                   {(detailsDenialRisk !== undefined ||
                     (lowConfidenceFields && lowConfidenceFields.length > 0)) && (
-                    <div className="rounded-lg bg-slate-50 p-3 text-sm">
-                      <p className="mb-1 font-medium text-slate-500">Details</p>
+                    <div className="rounded-lg bg-white/[0.03] p-3 text-sm">
+                      <p className="mb-1 font-medium text-slate-400">Details</p>
                       {detailsDenialRisk !== undefined && (
-                        <p className="text-slate-700">
-                          <span className="text-slate-500">Denial risk: </span>
+                        <p className="text-slate-200">
+                          <span className="text-slate-400">Denial risk: </span>
                           {Math.round(detailsDenialRisk * 100)}%
                         </p>
                       )}
                       {lowConfidenceFields && lowConfidenceFields.length > 0 && (
-                        <p className="text-slate-700">
-                          <span className="text-slate-500">
+                        <p className="text-slate-200">
+                          <span className="text-slate-400">
                             Low confidence fields:{" "}
                           </span>
                           {lowConfidenceFields.join(", ")}
@@ -487,7 +487,7 @@ export default function ReviewPage(): React.ReactElement {
                   <div onClick={(event) => event.stopPropagation()}>
                     <label
                       htmlFor={`review-comment-${item.id}`}
-                      className="mb-1.5 block text-xs font-medium text-slate-600"
+                      className="mb-1.5 block text-xs font-medium text-slate-300"
                     >
                       Reason for decision (optional)
                     </label>
@@ -525,7 +525,7 @@ export default function ReviewPage(): React.ReactElement {
                     </Button>
                     <Button
                       variant="outline"
-                      className="press flex-1 border-2 border-red-300 bg-white font-semibold text-red-600 hover:border-red-500 hover:bg-red-600 hover:text-white"
+                      className="press flex-1 border-2 border-red-500/30 bg-white/[0.03] font-semibold text-red-400 hover:border-red-500 hover:bg-red-600 hover:text-white"
                       disabled={isActing}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -547,7 +547,7 @@ export default function ReviewPage(): React.ReactElement {
       {toast && (
         <div
           role="status"
-          className="fixed bottom-6 right-6 z-50 max-w-sm rounded-lg border border-border bg-white px-4 py-3 text-sm shadow-card-hover"
+          className="fixed bottom-6 right-6 z-50 max-w-sm rounded-lg border border-white/10 bg-popover px-4 py-3 text-sm text-popover-foreground shadow-float"
         >
           {toast}
         </div>
