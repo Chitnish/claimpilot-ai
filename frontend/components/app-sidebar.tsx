@@ -182,7 +182,7 @@ export function AppSidebar({
   return (
     <aside
       className={cn(
-        "sidebar-surface fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-white/5 text-white",
+        "sidebar-surface fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-white/[0.06] text-white",
         "transition-[width,transform] duration-200 ease-out",
         collapsed ? "md:w-16" : "md:w-60",
         mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
@@ -191,7 +191,7 @@ export function AppSidebar({
       {/* Brand */}
       <div
         className={cn(
-          "flex h-14 shrink-0 items-center border-b border-white/5 px-3",
+          "flex h-14 shrink-0 items-center border-b border-white/[0.06] px-3",
           collapsed ? "justify-center" : "gap-2.5",
         )}
       >
@@ -232,7 +232,7 @@ export function AppSidebar({
           type="button"
           onClick={onToggleCollapse}
           aria-label="Expand sidebar"
-          className="hidden items-center justify-center border-b border-white/5 py-2 text-slate-400 transition-colors hover:bg-white/5 hover:text-white md:flex"
+          className="hidden items-center justify-center border-b border-white/[0.06] py-2 text-slate-400 transition-colors hover:bg-white/5 hover:text-white md:flex"
         >
           <PanelLeftOpen className="size-4" />
         </button>
@@ -243,7 +243,7 @@ export function AppSidebar({
         {NAV_SECTIONS.map((section, sectionIndex) => (
           <div key={section.label} className={cn(sectionIndex > 0 && "mt-5")}>
             {collapsed ? (
-              sectionIndex > 0 && <div className="mx-2 mb-2 border-t border-white/5" />
+              sectionIndex > 0 && <div className="mx-2 mb-2 border-t border-white/[0.06]" />
             ) : (
               <p className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                 {section.label}
@@ -306,7 +306,7 @@ export function AppSidebar({
       </nav>
 
       {/* User menu */}
-      <div className="shrink-0 border-t border-white/5 p-2.5" ref={menuRef}>
+      <div className="shrink-0 border-t border-white/[0.06] p-2.5" ref={menuRef}>
         <div className="relative">
           <button
             type="button"
@@ -350,7 +350,7 @@ export function AppSidebar({
                 collapsed ? "left-0 w-56" : "inset-x-0",
               )}
             >
-              <p className="border-b border-white/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              <p className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                 Switch role · demo identity
               </p>
               {DEMO_USERS.map((user) => {
