@@ -23,6 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Reveal } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 
 const ACCEPTED_TYPES = {
@@ -112,24 +113,30 @@ export default function UploadPage(): React.ReactElement {
 
   return (
     <div className="flex min-h-full items-center justify-center p-6 lg:p-8">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-md shadow-brand/20">
-            <CloudUpload className="size-6" />
+      <Reveal className="w-full max-w-2xl">
+      <Card className="relative overflow-hidden">
+        <span className="accent-glow -right-10 -top-10 size-40 bg-brand/30" aria-hidden />
+        <CardHeader className="relative text-center">
+          <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/30 ring-1 ring-white/30">
+            <CloudUpload className="size-7" />
           </div>
-          <CardTitle className="text-slate-900">Upload Superbills</CardTitle>
+          <CardTitle className="font-display text-xl text-slate-900">
+            Upload Superbills
+          </CardTitle>
           <CardDescription>
             Each superbill becomes a separate claim, processed in parallel
             through the pipeline.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative">
           {batchResult ? (
             <div className="space-y-4">
-              <div className="flex flex-col items-center rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-8">
-                <CheckCircle2 className="mb-3 size-10 text-emerald-600" />
-                <p className="text-center text-sm font-medium text-emerald-900">
-                  {batchResult.length} claims uploaded and processing.
+              <div className="flex flex-col items-center rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-6 py-8">
+                <div className="mb-3 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 ring-1 ring-white/30">
+                  <CheckCircle2 className="size-7" />
+                </div>
+                <p className="text-center font-display text-base font-semibold text-emerald-900">
+                  {batchResult.length} claims uploaded and processing
                 </p>
                 <p className="mt-1 text-center text-xs text-emerald-700">
                   Open each claim below to watch live agent activity.
@@ -140,15 +147,17 @@ export default function UploadPage(): React.ReactElement {
                   <li key={item.claimId}>
                     <Link
                       href={`/claims/${item.claimId}`}
-                      className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:border-brand/40 hover:bg-sky-50"
+                      className="group flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-sm shadow-sm transition-colors hover:border-brand/40 hover:bg-sky-50"
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <FileText className="size-4 shrink-0 text-slate-400" />
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-colors group-hover:bg-white group-hover:text-brand">
+                          <FileText className="size-4" />
+                        </span>
                         <span className="truncate font-medium text-slate-800">
                           {item.filename}
                         </span>
                       </span>
-                      <span className="ml-2 shrink-0 font-mono text-xs text-slate-500">
+                      <span className="ml-2 shrink-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs text-slate-500">
                         {item.claimId.slice(0, 8)}…
                       </span>
                     </Link>
@@ -177,10 +186,10 @@ export default function UploadPage(): React.ReactElement {
               <div
                 {...getRootProps()}
                 className={cn(
-                  "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-14 text-center transition-colors",
+                  "group relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-all duration-200",
                   isDragActive
-                    ? "border-solid border-brand bg-blue-50"
-                    : "border-brand/40 hover:border-brand/70 hover:bg-slate-50",
+                    ? "scale-[1.01] border-solid border-brand bg-brand/[0.06] ring-4 ring-brand/15"
+                    : "border-slate-300 hover:border-brand/60 hover:bg-slate-50",
                   uploading && "pointer-events-none opacity-60",
                 )}
               >
@@ -194,19 +203,38 @@ export default function UploadPage(): React.ReactElement {
                   </>
                 ) : (
                   <>
-                    <CloudUpload
+                    <div
                       className={cn(
-                        "mb-3 size-12 transition-colors",
-                        isDragActive ? "text-brand" : "text-slate-400",
+                        "mb-4 flex size-16 items-center justify-center rounded-2xl transition-all duration-200",
+                        isDragActive
+                          ? "bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/30 ring-1 ring-white/30"
+                          : "bg-slate-100 text-slate-400 ring-1 ring-slate-200 group-hover:bg-sky-50 group-hover:text-brand",
                       )}
-                    />
-                    <p className="text-base font-semibold text-slate-900">
-                      {isDragActive ? "Drop to upload" : "Drop superbills here"}
+                    >
+                      <CloudUpload className="size-8" />
+                    </div>
+                    <p className="font-display text-base font-semibold text-slate-900">
+                      {isDragActive
+                        ? "Drop to upload"
+                        : "Drop superbills here"}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      PDF or image files — upload multiple at once for batch
-                      processing
+                      or{" "}
+                      <span className="font-medium text-brand">
+                        browse files
+                      </span>{" "}
+                      — upload multiple at once for batch processing
                     </p>
+                    <div className="mt-4 flex items-center gap-2">
+                      {["PDF", "PNG", "JPG"].map((fmt) => (
+                        <span
+                          key={fmt}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500"
+                        >
+                          {fmt}
+                        </span>
+                      ))}
+                    </div>
                   </>
                 )}
               </div>
@@ -216,9 +244,9 @@ export default function UploadPage(): React.ReactElement {
                   {selectedFiles.map((file, index) => (
                     <li
                       key={`${file.name}-${file.size}-${index}`}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-slate-50 px-3 py-2 text-sm"
+                      className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-colors hover:border-brand/30"
                     >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-sm shadow-blue-500/25">
                         <FileText className="size-4" />
                       </span>
                       <span className="min-w-0 flex-1">
@@ -232,7 +260,7 @@ export default function UploadPage(): React.ReactElement {
                       <button
                         type="button"
                         onClick={() => removeFile(index)}
-                        className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-destructive/10 hover:text-destructive"
                         aria-label={`Remove ${file.name}`}
                       >
                         <X className="size-4" />
@@ -280,6 +308,7 @@ export default function UploadPage(): React.ReactElement {
           )}
         </CardContent>
       </Card>
+      </Reveal>
     </div>
   );
 }
