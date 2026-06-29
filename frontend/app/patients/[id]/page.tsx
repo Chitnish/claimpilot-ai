@@ -81,11 +81,11 @@ const usd0 = (n: number): string =>
   }).format(n);
 
 const inputClass =
-  "h-9 w-full rounded-md border border-input bg-white px-3 text-sm shadow-sm " +
+  "h-9 w-full rounded-md border border-input bg-white/[0.03] px-3 text-sm shadow-sm " +
   "focus:outline-none focus:ring-2 focus:ring-brand/40";
 
-const labelClass = "text-xs font-medium text-slate-500";
-const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-500";
+const labelClass = "text-xs font-medium text-slate-400";
+const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-400";
 
 const DOCUMENT_TYPES = [
   { value: "lab_result", label: "Lab Result" },
@@ -151,7 +151,7 @@ function Field({
           className={inputClass}
         />
       ) : (
-        <p className="text-sm text-slate-800">{displayText(value) || "—"}</p>
+        <p className="text-sm text-slate-100">{displayText(value) || "—"}</p>
       )}
     </div>
   );
@@ -288,7 +288,7 @@ export default function PatientDetailPage(): React.ReactElement {
   return (
     <div className="p-6 lg:p-8">
       {error && (
-        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <p className="mb-4 rounded-md border border-red-500/25 bg-red-500/10 px-4 py-2 text-sm text-red-300">
           {error}
         </p>
       )}
@@ -296,7 +296,7 @@ export default function PatientDetailPage(): React.ReactElement {
       <Reveal className="mb-6">
         <Link
           href="/patients"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-brand"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-brand"
         >
           <ArrowLeft className="size-3.5" />
           Patients
@@ -307,13 +307,13 @@ export default function PatientDetailPage(): React.ReactElement {
               {(p.lastName || p.firstName || "?").charAt(0).toUpperCase()}
             </span>
             <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="font-display text-2xl font-bold tracking-tight text-white">
                 {fullName}
               </h1>
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                 <span>
                   Member ID{" "}
-                  <span className="font-mono text-slate-700">
+                  <span className="font-mono text-slate-200">
                     {displayText(p.memberId)}
                   </span>
                 </span>
@@ -323,8 +323,8 @@ export default function PatientDetailPage(): React.ReactElement {
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
                     detail.stats.activeInsurance
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-100 text-slate-600",
+                      ? "bg-emerald-500/15 text-emerald-300"
+                      : "bg-white/[0.06] text-slate-300",
                   )}
                 >
                   <ShieldCheck className="size-3" />
@@ -420,7 +420,7 @@ export default function PatientDetailPage(): React.ReactElement {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <CardTitle className="flex items-center gap-2 text-base text-white">
               <Users className="size-4 text-brand" />
               Demographics
             </CardTitle>
@@ -459,7 +459,7 @@ export default function PatientDetailPage(): React.ReactElement {
               ) : (
                 <div>
                   <p className={labelClass}>Address</p>
-                  <p className="text-sm text-slate-800">
+                  <p className="text-sm text-slate-100">
                     {formatAddress(p.addressLine1, p.addressLine2, p.city, p.state, p.zipCode)}
                   </p>
                 </div>
@@ -479,7 +479,7 @@ export default function PatientDetailPage(): React.ReactElement {
         {editing ? (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base text-slate-900">Insurance</CardTitle>
+              <CardTitle className="text-base text-white">Insurance</CardTitle>
               <Badge variant={detail.stats.activeInsurance ? "success" : "muted"}>
                 {detail.stats.activeInsurance ? "Active" : "Inactive"}
               </Badge>
@@ -609,14 +609,14 @@ export default function PatientDetailPage(): React.ReactElement {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+          <CardTitle className="flex items-center gap-2 text-base text-white">
             <Users className="size-4 text-brand" />
             Contacts
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
           <div>
-            <p className="mb-2 text-sm font-semibold text-slate-900">
+            <p className="mb-2 text-sm font-semibold text-white">
               Emergency Contact
             </p>
             <div className="grid gap-3">
@@ -629,7 +629,7 @@ export default function PatientDetailPage(): React.ReactElement {
             </div>
           </div>
           <div>
-            <p className="mb-2 text-sm font-semibold text-slate-900">
+            <p className="mb-2 text-sm font-semibold text-white">
               Responsible Party
             </p>
             {p.responsiblePartyRelationship === "self" && !editing ? (
@@ -655,7 +655,7 @@ export default function PatientDetailPage(): React.ReactElement {
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <CardTitle className="flex items-center gap-2 text-base text-white">
               <Calendar className="size-4 text-brand" />
               Upcoming Appointments
             </CardTitle>
@@ -667,7 +667,7 @@ export default function PatientDetailPage(): React.ReactElement {
         </CardHeader>
         <CardContent>
           {showAddAppt && (
-            <div className="mb-4 rounded-lg border border-border bg-slate-50 p-4">
+            <div className="mb-4 rounded-lg border border-border bg-white/[0.03] p-4">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <p className={labelClass}>Date</p>
@@ -721,7 +721,7 @@ export default function PatientDetailPage(): React.ReactElement {
                 return (
                   <div
                     key={appt.id}
-                    className="flex items-center gap-4 rounded-xl border border-slate-200 p-3 transition-colors hover:border-brand/30 hover:bg-slate-50"
+                    className="flex items-center gap-4 rounded-xl border border-white/10 p-3 transition-colors hover:border-brand/30 hover:bg-white/[0.03]"
                   >
                     <div className="flex w-14 shrink-0 flex-col items-center rounded-xl bg-gradient-to-br from-brand to-brand-dark py-2 text-center text-white shadow-sm shadow-brand/25 ring-1 ring-white/20">
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-100">
@@ -732,7 +732,7 @@ export default function PatientDetailPage(): React.ReactElement {
                       </span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-900">
+                      <p className="text-sm font-medium text-white">
                         {appt.appointmentTime
                           ? formatTime(appt.appointmentTime)
                           : "All day"}
@@ -766,7 +766,7 @@ export default function PatientDetailPage(): React.ReactElement {
                   {pastAppts.map((appt) => (
                     <div key={appt.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-border p-3 opacity-80">
                       <div>
-                        <p className="text-sm text-slate-800">{formatDate(appt.appointmentDate)}</p>
+                        <p className="text-sm text-slate-100">{formatDate(appt.appointmentDate)}</p>
                         <p className="text-xs text-muted-foreground">
                           {formatAppointmentType(appt.appointmentType)} · {displayText(appt.providerName)}
                         </p>
@@ -786,7 +786,7 @@ export default function PatientDetailPage(): React.ReactElement {
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <CardTitle className="flex items-center gap-2 text-base text-white">
               <FileText className="size-4 text-brand" />
               Documents
             </CardTitle>
@@ -832,7 +832,7 @@ export default function PatientDetailPage(): React.ReactElement {
                 return (
                   <div
                     key={doc.id}
-                    className="group flex items-center gap-3 rounded-xl border border-slate-200 p-3 transition-all hover:border-brand/30 hover:shadow-sm"
+                    className="group flex items-center gap-3 rounded-xl border border-white/10 p-3 transition-all hover:border-brand/30 hover:shadow-sm"
                   >
                     <span
                       className={cn(
@@ -844,7 +844,7 @@ export default function PatientDetailPage(): React.ReactElement {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-medium text-slate-900">
+                        <span className="truncate text-sm font-medium text-white">
                           {doc.documentName}
                         </span>
                         <span className={badgeClass(documentTypeBadge(doc.documentType))}>
@@ -861,7 +861,7 @@ export default function PatientDetailPage(): React.ReactElement {
                         href={doc.downloadUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:border-brand/40 hover:text-brand"
+                        className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-brand/40 hover:text-brand"
                       >
                         Download
                       </a>
@@ -876,7 +876,7 @@ export default function PatientDetailPage(): React.ReactElement {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+          <CardTitle className="flex items-center gap-2 text-base text-white">
             <FileText className="size-4 text-brand" />
             Claims History
           </CardTitle>
@@ -893,7 +893,7 @@ export default function PatientDetailPage(): React.ReactElement {
           ) : (
             <div className="overflow-hidden rounded-lg border border-border">
               <Table>
-                <TableHeader className="bg-slate-50">
+                <TableHeader className="bg-white/[0.03]">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className={thClass}>Claim ID</TableHead>
                     <TableHead className={thClass}>Status</TableHead>
@@ -910,11 +910,11 @@ export default function PatientDetailPage(): React.ReactElement {
                     return (
                       <TableRow
                         key={claim.claimId}
-                        className="group cursor-pointer odd:bg-white even:bg-slate-50/50 hover:bg-brand/[0.05]"
+                        className="group cursor-pointer odd:bg-transparent even:bg-white/[0.03] hover:bg-brand/[0.05]"
                         onClick={() => router.push(`/claims/${claim.claimId}`)}
                       >
                         <TableCell>
-                          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-700 transition-colors group-hover:border-brand/30 group-hover:text-brand-dark">
+                          <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-xs text-slate-200 transition-colors group-hover:border-brand/30 group-hover:text-brand">
                             {truncateId(claim.claimId)}
                           </span>
                         </TableCell>
@@ -935,7 +935,7 @@ export default function PatientDetailPage(): React.ReactElement {
                         </TableCell>
                         <TableCell className="w-40">
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                               <div
                                 className={cn(
                                   "h-2 rounded-full",
@@ -944,12 +944,12 @@ export default function PatientDetailPage(): React.ReactElement {
                                 style={{ width: `${riskPercent}%` }}
                               />
                             </div>
-                            <span className="w-9 text-right text-xs tabular-nums text-slate-500">
+                            <span className="w-9 text-right text-xs tabular-nums text-slate-400">
                               {riskPercent}%
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500">
+                        <TableCell className="text-xs text-slate-400">
                           {formatDate(claim.createdAt)}
                         </TableCell>
                       </TableRow>
