@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Banknote, Loader2, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Loader2, Wallet } from "lucide-react";
 
 import { getArAging } from "@/lib/api";
 import { formatCurrency } from "@/lib/claim-ui";
@@ -27,7 +27,15 @@ import {
 } from "@/components/ui/card";
 import { StatCard, type StatAccent } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { CountUp, Reveal, Stagger, StaggerItem } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
+
+const usd0 = (n: number): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 import {
   Table,
   TableBody,
@@ -120,42 +128,73 @@ export default function AccountsReceivablePage(): React.ReactElement {
     };
   });
 
+  const overdueBucket = bucketMap.get("90+");
+  const overdueAmount = overdueBucket?.amount ?? 0;
+
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+      <Reveal className="mb-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Collections
+        </p>
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
           Accounts Receivable
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Outstanding patient balances and aging — what patients owe after
           insurance adjudication
         </p>
-      </div>
+      </Reveal>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          label="Total Patient A/R"
-          value={formatCurrency(data.totalOutstanding)}
-          subtitle={`${data.openAccounts} open account${data.openAccounts === 1 ? "" : "s"}`}
-          icon={Wallet}
-          accent="blue"
-        />
+      {/* Financial urgency banner */}
+      {overdueAmount > 0 && (
+        <Reveal className="mb-6">
+          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-rose-50 p-4 shadow-sm">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600 ring-1 ring-red-200">
+              <AlertTriangle className="size-5" />
+            </span>
+            <div className="text-sm">
+              <p className="font-semibold text-red-800">
+                {formatCurrency(overdueAmount)} in balances over 90 days
+              </p>
+              <p className="mt-0.5 text-red-700">
+                {overdueBucket?.count ?? 0} account
+                {(overdueBucket?.count ?? 0) === 1 ? "" : "s"} at high collection
+                risk
+                — prioritize follow-up.
+              </p>
+            </div>
+          </div>
+        </Reveal>
+      )}
+
+      <Stagger className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StaggerItem>
+          <StatCard
+            label="Total Patient A/R"
+            value={<CountUp value={data.totalOutstanding} format={usd0} />}
+            subtitle={`${data.openAccounts} open account${data.openAccounts === 1 ? "" : "s"}`}
+            icon={Wallet}
+            accent="blue"
+          />
+        </StaggerItem>
         {BUCKET_ORDER.map((bucket) => {
           const b = bucketMap.get(bucket);
           return (
-            <StatCard
-              key={bucket}
-              label={`${bucket} days`}
-              value={formatCurrency(b?.amount ?? 0)}
-              subtitle={`${b?.count ?? 0} account${(b?.count ?? 0) === 1 ? "" : "s"}`}
-              icon={Banknote}
-              accent={BUCKET_ACCENT[bucket] ?? "slate"}
-            />
+            <StaggerItem key={bucket}>
+              <StatCard
+                label={`${bucket} days`}
+                value={<CountUp value={b?.amount ?? 0} format={usd0} />}
+                subtitle={`${b?.count ?? 0} account${(b?.count ?? 0) === 1 ? "" : "s"}`}
+                icon={Banknote}
+                accent={BUCKET_ACCENT[bucket] ?? "slate"}
+              />
+            </StaggerItem>
           );
         })}
-      </div>
+      </Stagger>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <Reveal className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-base text-slate-900">
@@ -180,12 +219,13 @@ export default function AccountsReceivablePage(): React.ReactElement {
                   formatter={(value) => formatCurrency(Number(value))}
                   cursor={{ fill: "rgba(15,23,42,0.04)" }}
                   contentStyle={{
-                    borderRadius: 8,
+                    borderRadius: 12,
                     border: "1px solid #e2e8f0",
                     fontSize: 12,
+                    boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
                   }}
                 />
-                <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={56}>
                   {chartData.map((entry) => (
                     <Cell
                       key={entry.raw}
@@ -238,15 +278,16 @@ export default function AccountsReceivablePage(): React.ReactElement {
                         <TableRow
                           key={a.claimId}
                           className={cn(
+                            "group",
                             overdue
                               ? "bg-red-50/70 hover:bg-red-50"
-                              : "odd:bg-white even:bg-slate-50/50 hover:bg-blue-50/50",
+                              : "odd:bg-white even:bg-slate-50/50 hover:bg-brand/[0.05]",
                           )}
                         >
                           <TableCell>
                             <Link
                               href={`/claims/${a.claimId}`}
-                              className="font-mono text-xs font-medium text-brand hover:underline"
+                              className="inline-block rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs font-medium text-brand transition-colors hover:border-brand/40 hover:bg-sky-50"
                             >
                               {a.claimId.slice(0, 8).toUpperCase()}
                             </Link>
@@ -260,12 +301,20 @@ export default function AccountsReceivablePage(): React.ReactElement {
                           <TableCell>
                             <Badge
                               variant="outline"
-                              className={bucketBadgeClass(a.bucket)}
+                              className={cn(
+                                bucketBadgeClass(a.bucket),
+                                overdue && "animate-status-pulse-danger",
+                              )}
                             >
                               {a.bucket}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-bold tabular-nums text-slate-900">
+                          <TableCell
+                            className={cn(
+                              "text-right font-bold tabular-nums",
+                              overdue ? "text-red-700" : "text-slate-900",
+                            )}
+                          >
                             {formatCurrency(a.balance)}
                           </TableCell>
                         </TableRow>
@@ -277,7 +326,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
             )}
           </CardContent>
         </Card>
-      </div>
+      </Reveal>
     </div>
   );
 }
