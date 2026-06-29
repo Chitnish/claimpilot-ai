@@ -82,9 +82,21 @@ const pct = (n: number): string => `${Math.round(n)}%`;
 const ORG_NAME = "Riverside Medical Group";
 
 const thClass =
-  "text-xs font-semibold uppercase tracking-wider text-slate-500";
+  "text-xs font-semibold uppercase tracking-wider text-slate-400";
 const rowClass =
-  "cursor-pointer odd:bg-white even:bg-slate-50/50 hover:bg-blue-50/50";
+  "group cursor-pointer odd:bg-transparent even:bg-white/[0.02] hover:bg-white/[0.04]";
+
+// Dark chart styling, shared across this page's Recharts.
+const CHART_AXIS = "#94a3b8";
+const CHART_GRID = "rgba(148,163,184,0.12)";
+const CHART_TOOLTIP = {
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.1)",
+  background: "#131c30",
+  color: "#e8eef7",
+  fontSize: 12,
+  boxShadow: "0 12px 30px -12px rgba(0,0,0,0.7)",
+} as const;
 
 function statusChartData(
   statusCounts: Record<string, number>,
@@ -412,7 +424,7 @@ export default function DashboardPage(): React.ReactElement {
       <Reveal className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-slate-900">
+            <CardTitle className="text-base text-white">
               Claims by Status
             </CardTitle>
             <CardDescription>
@@ -436,11 +448,11 @@ export default function DashboardPage(): React.ReactElement {
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
-                    stroke="#e2e8f0"
+                    stroke={CHART_GRID}
                   />
                   <XAxis
                     dataKey="status"
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
                     interval={0}
                     angle={-25}
                     textAnchor="end"
@@ -448,16 +460,11 @@ export default function DashboardPage(): React.ReactElement {
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
                   />
                   <Tooltip
                     cursor={{ fill: "rgba(14,165,233,0.06)" }}
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: "1px solid #e2e8f0",
-                      fontSize: 12,
-                      boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
-                    }}
+                    contentStyle={CHART_TOOLTIP}
                   />
                   <Bar
                     dataKey="count"
@@ -473,7 +480,7 @@ export default function DashboardPage(): React.ReactElement {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-slate-900">
+            <CardTitle className="text-base text-white">
               Denial Risk Distribution
             </CardTitle>
             <CardDescription>
@@ -508,24 +515,19 @@ export default function DashboardPage(): React.ReactElement {
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
-                    stroke="#e2e8f0"
+                    stroke={CHART_GRID}
                   />
                   <XAxis
                     dataKey="bucket"
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
                     interval={0}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
                   />
                   <Tooltip
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: "1px solid #e2e8f0",
-                      fontSize: 12,
-                      boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
-                    }}
+                    contentStyle={CHART_TOOLTIP}
                   />
                   <Area
                     type="monotone"
@@ -548,7 +550,7 @@ export default function DashboardPage(): React.ReactElement {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <CardTitle className="flex items-center gap-2 text-base text-white">
               <FileText className="size-4 text-brand" />
               Recent Claims
             </CardTitle>
@@ -556,7 +558,7 @@ export default function DashboardPage(): React.ReactElement {
           </div>
           <Link
             href="/claims"
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-brand/40 hover:text-brand"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-brand/40 hover:text-brand"
           >
             View all
             <ArrowUpRight className="size-3.5" />
@@ -572,7 +574,7 @@ export default function DashboardPage(): React.ReactElement {
           ) : (
             <div className="overflow-hidden rounded-lg border border-border">
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
+                <TableHeader className="sticky top-0 z-10 bg-white/[0.03] backdrop-blur-sm">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className={thClass}>Claim ID</TableHead>
                     <TableHead className={thClass}>Status</TableHead>
@@ -600,7 +602,7 @@ export default function DashboardPage(): React.ReactElement {
                           }
                         }}
                       >
-                        <TableCell className="font-mono text-xs text-slate-700">
+                        <TableCell className="font-mono text-xs text-slate-200">
                           {claim.claimId ? truncateId(claim.claimId) : claimId}
                         </TableCell>
                         <TableCell>
@@ -619,7 +621,7 @@ export default function DashboardPage(): React.ReactElement {
                             displayText(claim.status)
                           )}
                         </TableCell>
-                        <TableCell className="text-sm text-slate-700">
+                        <TableCell className="text-sm text-slate-200">
                           {displayText(claim.providerName)}
                         </TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
@@ -627,7 +629,7 @@ export default function DashboardPage(): React.ReactElement {
                         </TableCell>
                         <TableCell className="w-40">
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-full rounded-full bg-slate-200">
+                            <div className="h-2 w-full rounded-full bg-white/10">
                               <div
                                 className={cn(
                                   "h-2 rounded-full transition-all",
@@ -636,12 +638,12 @@ export default function DashboardPage(): React.ReactElement {
                                 style={{ width: `${riskPercent}%` }}
                               />
                             </div>
-                            <span className="w-9 text-right text-xs tabular-nums text-slate-500">
+                            <span className="w-9 text-right text-xs tabular-nums text-slate-400">
                               {riskPercent}%
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500">
+                        <TableCell className="text-xs text-slate-400">
                           {claim.createdAt
                             ? new Date(claim.createdAt).toLocaleString()
                             : "—"}
