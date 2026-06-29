@@ -53,7 +53,7 @@ const STATUS_OPTIONS = [
   "reconciled",
 ] as const;
 
-const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-500";
+const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-400";
 
 export default function ClaimsWorkListPage(): React.ReactElement {
   const router = useRouter();
@@ -120,7 +120,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Work List
         </p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white">
           Claims
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -139,7 +139,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
               placeholder="Search by patient name, claim ID, or payer…"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-brand/40 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand/10"
+              className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-brand/40 focus:bg-white/[0.05] focus:outline-none focus:ring-4 focus:ring-brand/10"
             />
           </div>
 
@@ -152,7 +152,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                 "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                 statusFilter === ""
                   ? "border-brand bg-brand text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white",
               )}
             >
               All statuses
@@ -166,7 +166,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                   "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                   statusFilter === status
                     ? "border-brand bg-brand text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white",
                 )}
               >
                 {formatStatus(status)}
@@ -178,7 +178,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                 setPayerFilter(e.target.value);
                 setPage(0);
               }}
-              className="ml-auto h-8 rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
+              className="ml-auto h-8 rounded-full border border-white/10 bg-white/[0.03] px-3 text-xs font-medium text-slate-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
             >
               <option value="">All payers</option>
               {payerOptions.map((payer) => (
@@ -230,7 +230,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
           ) : (
             <div className="mt-4 overflow-hidden rounded-lg border border-border">
               <Table>
-                <TableHeader className="bg-slate-50">
+                <TableHeader className="bg-white/[0.03]">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className={thClass}>Claim ID</TableHead>
                     <TableHead className={thClass}>Status</TableHead>
@@ -251,7 +251,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                     return (
                       <TableRow
                         key={claim.claimId}
-                        className="group cursor-pointer odd:bg-white even:bg-slate-50/50 hover:bg-brand/[0.05]"
+                        className="group cursor-pointer odd:bg-transparent even:bg-white/[0.03] hover:bg-brand/[0.05]"
                         onClick={() => {
                           if (claim.claimId) {
                             router.push(`/claims/${claim.claimId}`);
@@ -259,7 +259,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                         }}
                       >
                         <TableCell>
-                          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-700 transition-colors group-hover:border-brand/30 group-hover:text-brand-dark">
+                          <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-xs text-slate-200 transition-colors group-hover:border-brand/30 group-hover:text-brand">
                             {truncateId(claim.claimId)}
                           </span>
                         </TableCell>
@@ -275,10 +275,10 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                             {formatStatus(claim.status)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-slate-700">
+                        <TableCell className="text-sm text-slate-200">
                           {displayText(claim.payerName)}
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-slate-600">
+                        <TableCell className="font-mono text-xs text-slate-300">
                           {displayText(claim.carcCode)}
                         </TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
@@ -286,7 +286,7 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                         </TableCell>
                         <TableCell className="w-40">
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                               <div
                                 className={cn(
                                   "h-2 rounded-full transition-all",
@@ -295,12 +295,12 @@ export default function ClaimsWorkListPage(): React.ReactElement {
                                 style={{ width: `${riskPercent}%` }}
                               />
                             </div>
-                            <span className="w-9 text-right text-xs font-medium tabular-nums text-slate-600">
+                            <span className="w-9 text-right text-xs font-medium tabular-nums text-slate-300">
                               {riskPercent}%
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500">
+                        <TableCell className="text-xs text-slate-400">
                           {claim.createdAt
                             ? new Date(claim.createdAt).toLocaleString()
                             : "—"}
