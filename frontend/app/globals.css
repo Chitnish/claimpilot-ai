@@ -3,50 +3,33 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    /* Surfaces stay neutral white so inputs/popovers/cards read cleanly;
-       the cool-gray page canvas (#f1f5f9) is applied at the app-shell level. */
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%; /* #0f172a slate-900 */
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-    --primary: 199 89% 48%; /* #0ea5e9 clinical sky */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%; /* slate-100 */
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%; /* #475569 slate-600 */
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%; /* #ef4444 */
-    --destructive-foreground: 0 0% 100%;
-    --border: 214.3 31.8% 91.4%; /* #e2e8f0 slate-200 */
-    --input: 214.3 31.8% 91.4%;
-    --ring: 199 89% 48%; /* sky focus ring */
-    --radius: 0.5rem;
-  }
+  /* ClaimPilot runs a single, unified dark theme everywhere (Solaris-style).
+     Surfaces are layered near-black navy; the brand sky is the only saturated
+     accent. `:root` and `.dark` hold identical values so the theme is stable
+     regardless of the `dark` class. */
+  :root,
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 199 89% 48%;
+    --background: 222 39% 6%; /* #0a0e17 page canvas (deepest) */
+    --foreground: 213 50% 94%; /* #e8eef7 near-white */
+    --card: 222 43% 10%; /* #0f1626 raised surface */
+    --card-foreground: 213 50% 94%;
+    --popover: 221 43% 13%; /* #131c30 elevated (menus) */
+    --popover-foreground: 213 50% 94%;
+    --primary: 199 89% 50%; /* #0ea5e9 clinical sky — sole accent */
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 41% 16%; /* #18223a hover/secondary surface */
+    --secondary-foreground: 213 50% 94%;
+    --muted: 222 41% 16%;
+    --muted-foreground: 215 20% 65%; /* #94a3b8 slate-400 */
+    --accent: 222 41% 16%;
+    --accent-foreground: 213 50% 94%;
+    --destructive: 0 72% 51%; /* #ef4444 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 30% 17%; /* hairline ~#1e2840 */
+    --input: 218 28% 19%;
+    --ring: 199 89% 52%;
+    --radius: 0.5rem;
+    color-scheme: dark;
   }
 }
 
@@ -63,12 +46,11 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  /* Display face (Figtree) for headings / hero numerals. */
+  /* One font everywhere — `.font-display` is the same Geist face, used at
+     heavier weights / tighter tracking for headings. No second family. */
   .font-display {
-    font-family:
-      var(--font-display), var(--font-sans), ui-sans-serif, system-ui,
-      sans-serif;
-    letter-spacing: -0.011em;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.014em;
   }
 }
 
@@ -101,13 +83,14 @@
      (depth, metric reveals) + selective OLED dark for ops consoles.
      ───────────────────────────────────────────────────────────────── */
 
-  /* Premium raised card: layered soft shadow + 1px top sheen for dimension. */
+  /* Premium raised card on dark: layered shadow + a faint top sheen so cards
+     visibly sit above the near-black canvas. */
   .surface-raised {
     background-color: hsl(var(--card));
     box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.04),
-      0 8px 24px -12px rgba(15, 23, 42, 0.12),
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 12px 30px -14px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
   }
 
   /* Hover-lift affordance for interactive cards (transform + opacity only). */
@@ -121,8 +104,8 @@
   .card-lift:hover {
     transform: translateY(-2px);
     box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.05),
-      0 18px 40px -16px rgba(15, 23, 42, 0.22);
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 22px 44px -18px rgba(0, 0, 0, 0.7);
   }
 
   /* Press feedback for buttons / clickable tiles. */

@@ -105,15 +105,15 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "surface-raised group relative overflow-hidden rounded-2xl border border-slate-200/70 p-5",
-        interactive && "card-lift cursor-pointer hover:border-slate-300",
+        "surface-raised group relative overflow-hidden rounded-2xl border border-white/[0.07] p-5",
+        interactive && "card-lift cursor-pointer hover:border-white/15",
         className,
       )}
     >
       {/* Top accent bar */}
       <span
         className={cn(
-          "absolute inset-x-0 top-0 h-1 bg-gradient-to-r opacity-80",
+          "absolute inset-x-0 top-0 h-1 bg-gradient-to-r opacity-90",
           a.bar,
         )}
         aria-hidden
@@ -126,22 +126,22 @@ export function StatCard({
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             <span className={cn("size-1.5 rounded-full", a.dot)} aria-hidden />
             {label}
           </p>
-          <p className="mt-2 font-display text-[1.75rem] font-bold leading-none tracking-tight text-slate-900">
+          <p className="mt-2 font-display text-[1.75rem] font-bold leading-none tracking-tight text-white">
             {value}
           </p>
           {subtitle ? (
-            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+            <p className="mt-2 text-xs leading-relaxed text-slate-400">
               {subtitle}
             </p>
           ) : null}
         </div>
         <div
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg ring-1 ring-white/40 transition-transform duration-200 group-hover:scale-105",
+            "flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg ring-1 ring-white/20 transition-transform duration-200 group-hover:scale-105",
             a.chip,
             a.chipShadow,
           )}

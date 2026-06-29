@@ -3,32 +3,32 @@ import { cn } from "@/lib/utils";
 export function appointmentStatusBadge(status: string): string {
   switch (status) {
     case "scheduled":
-      return "border-blue-200 bg-blue-100 text-blue-800";
+      return "border-blue-500/25 bg-blue-500/15 text-blue-300";
     case "completed":
-      return "border-emerald-200 bg-emerald-100 text-emerald-800";
+      return "border-emerald-500/25 bg-emerald-500/15 text-emerald-300";
     case "cancelled":
-      return "border-gray-200 bg-gray-100 text-gray-600";
+      return "border-white/10 bg-white/[0.06] text-slate-300";
     case "no_show":
-      return "border-red-200 bg-red-100 text-red-800";
+      return "border-red-500/25 bg-red-500/15 text-red-300";
     default:
-      return "border-gray-200 bg-gray-100 text-gray-600";
+      return "border-white/10 bg-white/[0.06] text-slate-300";
   }
 }
 
 export function documentTypeBadge(docType: string): string {
   switch (docType) {
     case "lab_result":
-      return "border-purple-200 bg-purple-100 text-purple-800";
+      return "border-purple-500/25 bg-purple-500/15 text-purple-300";
     case "appointment_note":
-      return "border-blue-200 bg-blue-100 text-blue-800";
+      return "border-blue-500/25 bg-blue-500/15 text-blue-300";
     case "referral":
-      return "border-teal-200 bg-teal-100 text-teal-800";
+      return "border-teal-500/25 bg-teal-500/15 text-teal-300";
     case "imaging":
-      return "border-orange-200 bg-orange-100 text-orange-800";
+      return "border-orange-500/25 bg-orange-500/15 text-orange-300";
     case "insurance_card":
-      return "border-emerald-200 bg-emerald-100 text-emerald-800";
+      return "border-emerald-500/25 bg-emerald-500/15 text-emerald-300";
     default:
-      return "border-gray-200 bg-gray-100 text-gray-600";
+      return "border-white/10 bg-white/[0.06] text-slate-300";
   }
 }
 

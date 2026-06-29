@@ -1,31 +1,14 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
-import { Geist, Figtree } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
 import { cn } from "@/lib/utils";
 import "./globals.css";
 
+// One font everywhere: Geist for all UI text. Geist Mono is the same type
+// family, reserved only for IDs / code microtext.
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
-
-// Display face for headings + hero numerals (skill recommendation).
-const figtree = Figtree({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-  variable: "--font-display",
-});
-
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: "ClaimPilot AI",
@@ -40,11 +23,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("font-sans", geist.variable, figtree.variable)}
+      className={cn("dark font-sans", geist.variable, geistMono.variable)}
     >
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
-      >
+      <body className="min-h-screen antialiased">
         <AppShell>{children}</AppShell>
       </body>
     </html>

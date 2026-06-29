@@ -78,22 +78,17 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: [
-          "var(--font-sans)",
-          "var(--font-geist-sans)",
-          "ui-sans-serif",
-          "system-ui",
-          "sans-serif",
-        ],
+        // One font everywhere — Geist (sans). `display` is the same family at
+        // heavier weights. Mono (Geist Mono) is reserved for IDs/code only.
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: [
-          "var(--font-display)",
           "var(--font-sans)",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
         ],
         mono: [
-          "var(--font-geist-mono)",
+          "var(--font-mono)",
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",
@@ -101,15 +96,14 @@ const config: Config = {
         ],
       },
       boxShadow: {
-        card: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
-        "card-hover":
-          "0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04)",
-        // Layered "Soft UI Evolution" elevations for the v2 system.
+        // Depth tuned for the near-black canvas (black-based, not navy).
+        card: "0 1px 2px rgba(0,0,0,0.4)",
+        "card-hover": "0 8px 24px -12px rgba(0,0,0,0.55)",
         elevated:
-          "0 1px 2px rgba(15,23,42,0.04), 0 10px 30px -12px rgba(15,23,42,0.18)",
-        float: "0 24px 60px -18px rgba(15,23,42,0.28)",
+          "0 1px 2px rgba(0,0,0,0.4), 0 12px 30px -14px rgba(0,0,0,0.55)",
+        float: "0 28px 60px -20px rgba(0,0,0,0.7)",
         "glow-brand":
-          "0 0 0 1px rgba(14,165,233,0.18), 0 12px 32px -10px rgba(14,165,233,0.40)",
+          "0 0 0 1px rgba(14,165,233,0.22), 0 12px 32px -10px rgba(14,165,233,0.40)",
       },
       borderRadius: {
         "2xl": "1rem",

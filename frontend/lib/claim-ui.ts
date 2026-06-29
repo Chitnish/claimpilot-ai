@@ -5,15 +5,17 @@ import { badgeVariants } from "@/components/ui/badge";
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
+// Dark-native agent tints (translucent fill + 300 text) for the ops console.
 const AGENT_COLORS: Record<string, string> = {
-  intake: "bg-blue-100 text-blue-800 border-blue-200",
-  coding: "bg-purple-100 text-purple-800 border-purple-200",
-  scrub: "bg-orange-100 text-orange-800 border-orange-200",
-  submission: "bg-red-100 text-red-800 border-red-200",
-  reconciliation: "bg-green-100 text-green-800 border-green-200",
-  fraud: "border-gray-300 bg-gray-50 text-gray-700",
-  human_review: "border-amber-300 bg-amber-50 text-amber-700",
-  system: "bg-gray-100 text-gray-700 border-gray-200",
+  intake: "bg-blue-500/15 text-blue-300 border-blue-500/25",
+  eligibility: "bg-teal-500/15 text-teal-300 border-teal-500/25",
+  coding: "bg-purple-500/15 text-purple-300 border-purple-500/25",
+  scrub: "bg-orange-500/15 text-orange-300 border-orange-500/25",
+  submission: "bg-red-500/15 text-red-300 border-red-500/25",
+  reconciliation: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+  fraud: "border-white/10 bg-white/[0.06] text-slate-300",
+  human_review: "border-amber-500/25 bg-amber-500/15 text-amber-300",
+  system: "bg-white/[0.06] text-slate-300 border-white/10",
 };
 
 export function agentBadgeClass(agent: string): string {
@@ -39,22 +41,22 @@ export function statusBadgeVariant(status: string): BadgeVariant {
 // status always reads the same. Returns Tailwind classes layered over the
 // Badge base (which already supplies layout + border width).
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  reconciled: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  paid: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  needs_review: "bg-amber-100 text-amber-800 border-amber-200",
-  appealed: "bg-orange-100 text-orange-800 border-orange-200",
-  denied: "bg-red-100 text-red-800 border-red-200",
-  submitted: "bg-blue-100 text-blue-800 border-blue-200",
-  draft: "bg-gray-100 text-gray-700 border-gray-200",
-  extracted: "bg-slate-100 text-slate-700 border-slate-200",
-  coded: "bg-purple-100 text-purple-800 border-purple-200",
-  scrubbed: "bg-cyan-100 text-cyan-800 border-cyan-200",
+  reconciled: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+  paid: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+  needs_review: "bg-amber-500/15 text-amber-300 border-amber-500/25",
+  appealed: "bg-orange-500/15 text-orange-300 border-orange-500/25",
+  denied: "bg-red-500/15 text-red-300 border-red-500/25",
+  submitted: "bg-blue-500/15 text-blue-300 border-blue-500/25",
+  draft: "bg-white/[0.06] text-slate-300 border-white/10",
+  extracted: "bg-slate-500/15 text-slate-300 border-slate-500/25",
+  coded: "bg-purple-500/15 text-purple-300 border-purple-500/25",
+  scrubbed: "bg-cyan-500/15 text-cyan-300 border-cyan-500/25",
 };
 
 export function statusBadgeClass(status: string): string {
   return (
     STATUS_BADGE_CLASSES[status] ??
-    "bg-slate-100 text-slate-700 border-slate-200"
+    "bg-white/[0.06] text-slate-300 border-white/10"
   );
 }
 

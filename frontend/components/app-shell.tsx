@@ -32,7 +32,7 @@ export function AppShell({
   }, []);
 
   return (
-    <div className="min-h-screen bg-clinical-content">
+    <div className="min-h-screen bg-background">
       {/* Mobile top bar */}
       <header className="sidebar-surface fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-white/10 px-4 text-white backdrop-blur-sm md:hidden">
         <button
