@@ -285,7 +285,7 @@ export default function ClaimDetailPage(): React.ReactElement {
       <div className="mb-6">
         <Link
           href="/claims"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-brand"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 transition-colors hover:text-brand"
         >
           <ArrowLeft className="size-3.5" />
           Claims
@@ -295,9 +295,9 @@ export default function ClaimDetailPage(): React.ReactElement {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
               Claim Detail
             </p>
-            <h1 className="mt-1.5 flex flex-wrap items-center gap-2.5 font-display text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="mt-1.5 flex flex-wrap items-center gap-2.5 font-display text-2xl font-bold tracking-tight text-white">
               Claim
-              <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-base font-medium text-slate-700">
+              <span className="rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-base font-medium text-slate-200">
                 {truncateId(claim.claimId, 12)}
               </span>
             </h1>
@@ -321,29 +321,29 @@ export default function ClaimDetailPage(): React.ReactElement {
       </div>
 
       {isDenied && claim.carcCode && (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
-          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-red-600" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-500/25 bg-red-500/10 p-4">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-red-400" />
           <div className="text-sm">
-            <p className="font-semibold text-red-800">
+            <p className="font-semibold text-red-300">
               Denied — CARC {claim.carcCode}
               {claim.rarcCode ? ` / RARC ${claim.rarcCode}` : ""}
             </p>
-            <p className="mt-0.5 text-red-700">{claim.denialReason}</p>
+            <p className="mt-0.5 text-red-300">{claim.denialReason}</p>
             {claim.rarcReason && (
-              <p className="mt-0.5 text-red-700/80">{claim.rarcReason}</p>
+              <p className="mt-0.5 text-red-300/80">{claim.rarcReason}</p>
             )}
           </div>
         </div>
       )}
 
       {claim.frequencyCode === "7" && claim.originalClaimId && (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4">
-          <RefreshCw className="mt-0.5 size-5 shrink-0 text-brand-dark" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-sky-500/25 bg-sky-500/10 p-4">
+          <RefreshCw className="mt-0.5 size-5 shrink-0 text-brand" />
           <div className="text-sm">
-            <p className="font-semibold text-sky-900">
+            <p className="font-semibold text-sky-200">
               Corrected claim (837P frequency 7 — replacement)
             </p>
-            <p className="mt-0.5 text-sky-800/90">
+            <p className="mt-0.5 text-sky-300/90">
               Replaces original claim{" "}
               <Link
                 href={`/claims/${claim.originalClaimId}`}
@@ -360,7 +360,7 @@ export default function ClaimDetailPage(): React.ReactElement {
               .
             </p>
             {claim.correctionReason && (
-              <p className="mt-0.5 text-sky-800/70">
+              <p className="mt-0.5 text-sky-300/70">
                 Reason: {claim.correctionReason}
               </p>
             )}
@@ -369,13 +369,13 @@ export default function ClaimDetailPage(): React.ReactElement {
       )}
 
       {claim.correctedByClaimId && (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <Link2 className="mt-0.5 size-5 shrink-0 text-amber-600" />
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4">
+          <Link2 className="mt-0.5 size-5 shrink-0 text-amber-400" />
           <div className="text-sm">
-            <p className="font-semibold text-amber-800">
+            <p className="font-semibold text-amber-300">
               Superseded by a corrected claim
             </p>
-            <p className="mt-0.5 text-amber-700">
+            <p className="mt-0.5 text-amber-300">
               A corrected replacement was filed for this claim —{" "}
               <Link
                 href={`/claims/${claim.correctedByClaimId}`}
@@ -448,9 +448,9 @@ export default function ClaimDetailPage(): React.ReactElement {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   {claim.eligibilityActive ? (
-                    <ShieldCheck className="size-4 text-emerald-600" />
+                    <ShieldCheck className="size-4 text-emerald-400" />
                   ) : (
-                    <ShieldAlert className="size-4 text-red-600" />
+                    <ShieldAlert className="size-4 text-red-400" />
                   )}
                   Coverage &amp; benefits
                 </CardTitle>
@@ -506,7 +506,7 @@ export default function ClaimDetailPage(): React.ReactElement {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <DollarSign className="size-4 text-emerald-600" />
+                <DollarSign className="size-4 text-emerald-400" />
                 Financials
               </CardTitle>
             </CardHeader>
@@ -521,7 +521,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                 <div className="space-y-1.5 rounded-md border bg-muted/30 p-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Payer paid</span>
-                    <span className="font-medium text-emerald-700">
+                    <span className="font-medium text-emerald-300">
                       {formatCurrency(claim.amountPaid)}
                     </span>
                   </div>
@@ -534,7 +534,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                     </span>
                   </div>
                   {claim.reconDiscrepancy && (
-                    <div className="flex items-center justify-between text-amber-700">
+                    <div className="flex items-center justify-between text-amber-300">
                       <span className="flex items-center gap-1">
                         <AlertTriangle className="size-3.5" />
                         Variance vs expected
@@ -559,7 +559,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                   <span className="text-muted-foreground">Denial risk</span>
                   <span className="font-medium">{riskPercent}%</span>
                 </div>
-                <div className="h-2 w-full rounded-full bg-gray-200">
+                <div className="h-2 w-full rounded-full bg-white/10">
                   <div
                     className={cn(
                       "h-2 rounded-full transition-all",
@@ -580,10 +580,10 @@ export default function ClaimDetailPage(): React.ReactElement {
                           className={cn(
                             "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
                             factor.includes("+")
-                              ? "bg-amber-100 text-amber-800"
+                              ? "bg-amber-500/15 text-amber-300"
                               : factor.includes("-")
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-gray-100 text-gray-700",
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : "bg-white/[0.06] text-slate-200",
                           )}
                         >
                           {factor}
@@ -596,7 +596,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                   <div className="mt-2">
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       {claim.anomalyReasons.length > 0 ? (
-                        <ShieldAlert className="size-3.5 shrink-0 text-red-600" />
+                        <ShieldAlert className="size-3.5 shrink-0 text-red-400" />
                       ) : (
                         <Info className="size-3.5 shrink-0" />
                       )}
@@ -609,7 +609,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                         {claim.anomalyReasons.map((reason, i) => (
                           <li
                             key={i}
-                            className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50/60 p-2 text-xs text-red-800"
+                            className="flex items-start gap-2 rounded-md border border-red-500/25 bg-red-500/10 p-2 text-xs text-red-300"
                           >
                             <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
                             <span>{reason}</span>
@@ -621,13 +621,13 @@ export default function ClaimDetailPage(): React.ReactElement {
                 )}
               </div>
               {claim.patientBalance > 0 && (
-                <div className="space-y-1.5 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm">
+                <div className="space-y-1.5 rounded-md border border-sky-500/25 bg-sky-500/10 p-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 font-medium text-sky-900">
+                    <span className="flex items-center gap-1.5 font-medium text-sky-200">
                       <Receipt className="size-3.5" />
                       Patient balance due
                     </span>
-                    <span className="font-semibold text-sky-900">
+                    <span className="font-semibold text-sky-200">
                       {formatCurrency(claim.patientBalance)}
                     </span>
                   </div>
@@ -745,7 +745,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                     )}
                   </div>
                   {sendSuccess && (
-                    <p className="text-sm text-emerald-600">
+                    <p className="text-sm text-emerald-400">
                       Appeal email sent successfully.
                     </p>
                   )}
@@ -862,7 +862,7 @@ export default function ClaimDetailPage(): React.ReactElement {
             <div className="scrollbar-thin max-h-[32rem] overflow-y-auto pr-1">
               {events.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-12 text-center">
-                  <Loader2 className="size-5 animate-spin text-slate-500" />
+                  <Loader2 className="size-5 animate-spin text-slate-400" />
                   <p className="text-sm text-slate-400">
                     Waiting for agent events…
                   </p>
@@ -888,7 +888,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                       >
                         {event.agent.replace(/_/g, " ")}
                       </span>
-                      <span className="font-mono text-[11px] text-slate-500">
+                      <span className="font-mono text-[11px] text-slate-400">
                         {event.receivedAt.toLocaleTimeString()}
                       </span>
                     </div>
@@ -1005,7 +1005,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                         {formatCurrency(claim.era.totalBilled)}
                       </td>
                       <td className="px-2 py-2.5" />
-                      <td className="px-2 py-2.5 text-right text-emerald-700">
+                      <td className="px-2 py-2.5 text-right text-emerald-300">
                         {formatCurrency(claim.era.totalPaid)}
                       </td>
                       <td className="px-2 py-2.5 text-right">
@@ -1037,10 +1037,10 @@ export default function ClaimDetailPage(): React.ReactElement {
                         className={cn(
                           "inline-flex rounded px-1.5 py-0.5 font-mono text-xs font-medium",
                           adj.group === "PR"
-                            ? "bg-blue-100 text-blue-800"
+                            ? "bg-blue-500/15 text-blue-300"
                             : adj.group === "CO"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-amber-100 text-amber-800",
+                              ? "bg-red-500/15 text-red-300"
+                              : "bg-amber-500/15 text-amber-300",
                         )}
                       >
                         {adj.group}-{adj.carc}
@@ -1084,16 +1084,16 @@ export default function ClaimDetailPage(): React.ReactElement {
                 className={cn(
                   "flex items-start gap-3 rounded-md border p-3 text-sm",
                   finding.severity === "error"
-                    ? "border-red-200 bg-red-50/60"
-                    : "border-amber-200 bg-amber-50/60",
+                    ? "border-red-500/25 bg-red-500/10"
+                    : "border-amber-500/25 bg-amber-500/10",
                 )}
               >
                 <AlertTriangle
                   className={cn(
                     "mt-0.5 size-4 shrink-0",
                     finding.severity === "error"
-                      ? "text-red-600"
-                      : "text-amber-600",
+                      ? "text-red-400"
+                      : "text-amber-400",
                   )}
                 />
                 <div className="min-w-0">
@@ -1120,7 +1120,7 @@ export default function ClaimDetailPage(): React.ReactElement {
         <Reveal>
           <section className="mt-8">
             <div className="mb-4">
-              <h2 className="font-display text-xl font-bold tracking-tight text-slate-900">
+              <h2 className="font-display text-xl font-bold tracking-tight text-white">
                 Dispute Log
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -1146,9 +1146,9 @@ export default function ClaimDetailPage(): React.ReactElement {
                   </div>
                 </div>
               </div>
-              <CardContent className="space-y-4 bg-slate-50/60 pt-6">
+              <CardContent className="space-y-4 bg-white/[0.03] pt-6">
                 {claim.hasPendingDispute && (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
                     <MessageSquareWarning className="mt-0.5 size-4 shrink-0" />
                     <p>
                       This dispute has been flagged for human review.{" "}
@@ -1178,7 +1178,7 @@ export default function ClaimDetailPage(): React.ReactElement {
                               "flex size-8 shrink-0 items-center justify-center rounded-full shadow-sm ring-1",
                               isAi
                                 ? "bg-gradient-to-br from-brand to-brand-dark text-white ring-white/30"
-                                : "bg-white text-slate-500 ring-slate-200",
+                                : "bg-white/[0.03] text-slate-400 ring-white/10",
                             )}
                           >
                             {isAi ? (
@@ -1192,13 +1192,13 @@ export default function ClaimDetailPage(): React.ReactElement {
                               "max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm",
                               isAi
                                 ? "rounded-br-sm bg-gradient-to-br from-brand to-brand-dark text-white"
-                                : "rounded-bl-sm border border-slate-200 bg-white text-slate-700",
+                                : "rounded-bl-sm border border-white/10 bg-white/[0.03] text-slate-200",
                             )}
                           >
                             <p
                               className={cn(
                                 "mb-1.5 text-xs font-semibold",
-                                isAi ? "text-sky-100" : "text-slate-600",
+                                isAi ? "text-sky-100" : "text-slate-300",
                               )}
                             >
                               {disputeSenderLabel(msg.sender)}

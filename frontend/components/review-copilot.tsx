@@ -128,7 +128,7 @@ export function ReviewCopilot({
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+            <CardTitle className="flex items-center gap-2 text-base text-white">
               <Sparkles className="size-4 text-brand" />
               Review Copilot
             </CardTitle>
@@ -143,7 +143,7 @@ export function ReviewCopilot({
               "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
               plainLanguage
                 ? "border-brand bg-brand text-white"
-                : "border-slate-200 bg-background text-slate-600 hover:bg-slate-100",
+                : "border-white/10 bg-background text-slate-300 hover:bg-white/[0.06]",
             )}
           >
             Explain terms simply
@@ -152,7 +152,7 @@ export function ReviewCopilot({
       </CardHeader>
       <CardContent>
         {needsHumanReview && (
-          <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-300">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <span>Pipeline paused — ask the copilot before deciding.</span>
           </div>
@@ -170,7 +170,7 @@ export function ReviewCopilot({
                     key={prompt}
                     type="button"
                     onClick={() => void send(prompt)}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-brand-dark transition-colors hover:bg-slate-100"
+                    className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-brand transition-colors hover:bg-white/[0.06]"
                   >
                     {prompt}
                   </button>
@@ -191,7 +191,7 @@ export function ReviewCopilot({
                     "flex size-7 shrink-0 items-center justify-center rounded-full",
                     turn.role === "user"
                       ? "bg-brand text-white"
-                      : "bg-slate-100 text-brand",
+                      : "bg-white/[0.06] text-brand",
                   )}
                 >
                   {turn.role === "user" ? (
@@ -211,11 +211,11 @@ export function ReviewCopilot({
                       "inline-block rounded-lg px-3 py-2 text-sm leading-relaxed",
                       turn.role === "user"
                         ? "whitespace-pre-wrap bg-brand text-white"
-                        : "bg-slate-100 text-foreground",
+                        : "bg-white/[0.06] text-foreground",
                     )}
                   >
                     {turn.role === "assistant" ? (
-                      <div className="prose prose-sm max-w-none text-left prose-headings:text-slate-900 prose-strong:text-slate-900 prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-ol:my-1.5 prose-ul:my-1.5 prose-li:my-0.5">
+                      <div className="prose prose-sm prose-invert max-w-none text-left prose-headings:text-white prose-strong:text-white prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-ol:my-1.5 prose-ul:my-1.5 prose-li:my-0.5">
                         <ReactMarkdown>{turn.content}</ReactMarkdown>
                       </div>
                     ) : (
@@ -226,12 +226,12 @@ export function ReviewCopilot({
                   {turn.role === "assistant" &&
                     turn.suggestedActions &&
                     turn.suggestedActions.length > 0 && (
-                      <div className="rounded-md border border-emerald-200 bg-emerald-50/60 p-2.5 text-left">
-                        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+                      <div className="rounded-md border border-emerald-500/25 bg-emerald-500/10 p-2.5 text-left">
+                        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
                           <Lightbulb className="size-3.5" />
                           Suggested actions
                         </p>
-                        <ul className="space-y-1 text-xs text-emerald-900">
+                        <ul className="space-y-1 text-xs text-emerald-200">
                           {turn.suggestedActions.map((action, i) => (
                             <li key={i} className="flex gap-1.5">
                               <span className="text-emerald-500">•</span>
@@ -263,7 +263,7 @@ export function ReviewCopilot({
           )}
 
           {error && (
-            <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="flex items-start gap-2 rounded-md border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-300">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               <span>{error}</span>
             </div>

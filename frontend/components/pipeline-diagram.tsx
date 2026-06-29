@@ -26,8 +26,9 @@ const AGENT_COLORS: Record<AgentName, string> = {
 
 const HUMAN_REVIEW_COLOR = "#f59e0b";
 
-const IDLE_BORDER = "#cbd5e1"; // slate-300
-const IDLE_TEXT = "#64748b"; // slate-500
+const IDLE_SURFACE = "#131c30"; // dark idle node surface
+const IDLE_BORDER = "#334155"; // slate-700
+const IDLE_TEXT = "#94a3b8"; // slate-400
 const GREEN_ARROW = "#22c55e";
 
 export interface PipelineDiagramProps {
@@ -86,7 +87,7 @@ function AgentNode({
   const active = isAgentActive(agent, activeAgent);
   const review = needsReview(agent, status);
 
-  let background = "#ffffff";
+  let background = IDLE_SURFACE;
   let borderColor = IDLE_BORDER;
   let textColor = IDLE_TEXT;
   let prefix = "";
@@ -96,14 +97,14 @@ function AgentNode({
     borderColor = color;
     textColor = "#ffffff";
   } else if (review) {
-    background = "#ffffff";
+    background = IDLE_SURFACE;
     borderColor = HUMAN_REVIEW_COLOR;
-    textColor = color;
+    textColor = HUMAN_REVIEW_COLOR;
     prefix = "⚠ ";
   } else if (completed) {
-    background = hexWithOpacity(color, 0.1);
+    background = hexWithOpacity(color, 0.16);
     borderColor = color;
-    textColor = color;
+    textColor = "#ffffff";
     prefix = "✓ ";
   }
 
@@ -124,8 +125,8 @@ function AgentNode({
     padding: "0 6px",
     flexShrink: 0,
     boxShadow: active
-      ? `0 4px 14px ${hexWithOpacity(color, 0.35)}`
-      : "0 1px 2px rgba(15,23,42,0.06)",
+      ? `0 4px 14px ${hexWithOpacity(color, 0.45)}`
+      : "0 1px 2px rgba(0,0,0,0.4)",
   };
 
   if (active) {
@@ -254,7 +255,7 @@ export function PipelineDiagram({
   const isLive = activeAgent !== null;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-card shadow-elevated">
+    <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-card shadow-elevated">
       <div className="sidebar-surface flex items-center justify-between border-b border-white/10 px-5 py-3.5">
         <div className="flex items-center gap-2.5">
           <span className="relative flex size-2.5">
@@ -280,12 +281,12 @@ export function PipelineDiagram({
           7 AI Agents
         </span>
       </div>
-      <div className="relative bg-gradient-to-b from-slate-50 to-white p-5 sm:p-7">
+      <div className="relative bg-gradient-to-b from-[#0c1322] to-[#0a0f1e] p-5 sm:p-7">
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.5]"
+          className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 50% 0%, rgba(14,165,233,0.06), transparent 60%)",
+              "radial-gradient(circle at 50% 0%, rgba(14,165,233,0.1), transparent 60%)",
           }}
           aria-hidden
         />
