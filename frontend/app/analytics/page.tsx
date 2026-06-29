@@ -54,7 +54,19 @@ import {
 const REFRESH_INTERVAL_MS = 30_000;
 const CHART_PRIMARY = "#0ea5e9";
 
-const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-500";
+const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-400";
+
+// Dark chart styling, shared across this page's Recharts.
+const CHART_AXIS = "#94a3b8";
+const CHART_GRID = "rgba(148,163,184,0.12)";
+const CHART_TOOLTIP = {
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.1)",
+  background: "#131c30",
+  color: "#e8eef7",
+  fontSize: 12,
+  boxShadow: "0 12px 30px -12px rgba(0,0,0,0.7)",
+} as const;
 
 const usd0 = (n: number): string =>
   new Intl.NumberFormat("en-US", {
@@ -123,7 +135,7 @@ export default function AnalyticsPage(): React.ReactElement {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Performance Intelligence
         </p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white">
           Analytics
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -169,7 +181,7 @@ export default function AnalyticsPage(): React.ReactElement {
       </Stagger>
 
       <Reveal className="mb-3 flex items-center gap-3 border-t border-border pt-5">
-        <h2 className="font-display text-base font-semibold text-slate-900">
+        <h2 className="font-display text-base font-semibold text-white">
           Operational KPIs
         </h2>
         <span className="text-xs text-muted-foreground">
@@ -240,13 +252,13 @@ export default function AnalyticsPage(): React.ReactElement {
       </Stagger>
 
       <Reveal>
-        <h2 className="mb-3 border-t border-border pt-5 font-display text-base font-semibold text-slate-900">
+        <h2 className="mb-3 border-t border-border pt-5 font-display text-base font-semibold text-white">
           Denial &amp; Pipeline Insights
         </h2>
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base text-slate-900">
+              <CardTitle className="text-base text-white">
                 Top Denial Reasons
               </CardTitle>
               <CardDescription>
@@ -275,27 +287,22 @@ export default function AnalyticsPage(): React.ReactElement {
                       <CartesianGrid
                         strokeDasharray="3 3"
                         horizontal={false}
-                        stroke="#e2e8f0"
+                        stroke={CHART_GRID}
                       />
                       <XAxis
                         type="number"
                         allowDecimals={false}
-                        tick={{ fontSize: 11, fill: "#64748b" }}
+                        tick={{ fontSize: 11, fill: CHART_AXIS }}
                       />
                       <YAxis
                         type="category"
                         dataKey="label"
                         width={72}
-                        tick={{ fontSize: 11, fill: "#64748b" }}
+                        tick={{ fontSize: 11, fill: CHART_AXIS }}
                       />
                       <Tooltip
                         cursor={{ fill: "rgba(239,68,68,0.06)" }}
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid #e2e8f0",
-                          fontSize: 12,
-                          boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
-                        }}
+                        contentStyle={CHART_TOOLTIP}
                         formatter={(value) => [value, "Claims"]}
                         labelFormatter={(label) => {
                           const entry = denialData.find((d) => d.label === label);
@@ -318,7 +325,7 @@ export default function AnalyticsPage(): React.ReactElement {
                         key={reason.label}
                         className="text-xs text-muted-foreground"
                       >
-                        <span className="font-mono font-medium text-slate-700">
+                        <span className="font-mono font-medium text-slate-200">
                           {reason.label}
                         </span>{" "}
                         — {reason.description}
@@ -332,7 +339,7 @@ export default function AnalyticsPage(): React.ReactElement {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base text-slate-900">
+              <CardTitle className="text-base text-white">
                 Claims by Status
               </CardTitle>
               <CardDescription>Current pipeline distribution</CardDescription>
@@ -354,11 +361,11 @@ export default function AnalyticsPage(): React.ReactElement {
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
-                      stroke="#e2e8f0"
+                      stroke={CHART_GRID}
                     />
                     <XAxis
                       dataKey="status"
-                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      tick={{ fontSize: 11, fill: CHART_AXIS }}
                       interval={0}
                       angle={-25}
                       textAnchor="end"
@@ -366,16 +373,11 @@ export default function AnalyticsPage(): React.ReactElement {
                     />
                     <YAxis
                       allowDecimals={false}
-                      tick={{ fontSize: 11, fill: "#64748b" }}
+                      tick={{ fontSize: 11, fill: CHART_AXIS }}
                     />
                     <Tooltip
                       cursor={{ fill: "rgba(14,165,233,0.06)" }}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid #e2e8f0",
-                        fontSize: 12,
-                        boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
-                      }}
+                      contentStyle={CHART_TOOLTIP}
                     />
                     <Bar
                       dataKey="count"
@@ -394,7 +396,7 @@ export default function AnalyticsPage(): React.ReactElement {
       <Reveal className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-slate-900">
+            <CardTitle className="text-base text-white">
               Payer Performance
             </CardTitle>
             <CardDescription>
@@ -409,7 +411,7 @@ export default function AnalyticsPage(): React.ReactElement {
             ) : (
               <div className="overflow-hidden rounded-lg border border-border">
                 <Table>
-                  <TableHeader className="bg-slate-50">
+                  <TableHeader className="bg-white/[0.03]">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className={thClass}>Payer</TableHead>
                       <TableHead className={cn(thClass, "text-right")}>
@@ -427,9 +429,9 @@ export default function AnalyticsPage(): React.ReactElement {
                     {data.payers.map((payer) => (
                       <TableRow
                         key={payer.payer}
-                        className="odd:bg-white even:bg-slate-50/50 hover:bg-blue-50/50"
+                        className="odd:bg-transparent even:bg-white/[0.03] hover:bg-white/[0.04]"
                       >
-                        <TableCell className="text-sm font-medium text-slate-800">
+                        <TableCell className="text-sm font-medium text-slate-100">
                           {payer.payer}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
@@ -443,10 +445,10 @@ export default function AnalyticsPage(): React.ReactElement {
                             variant="outline"
                             className={cn(
                               payer.denialRate >= 0.3
-                                ? "bg-red-100 text-red-800 border-red-200"
+                                ? "bg-red-500/15 text-red-300 border-red-500/25"
                                 : payer.denialRate >= 0.15
-                                  ? "bg-amber-100 text-amber-800 border-amber-200"
-                                  : "bg-emerald-100 text-emerald-800 border-emerald-200",
+                                  ? "bg-amber-500/15 text-amber-300 border-amber-500/25"
+                                  : "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
                             )}
                           >
                             {Math.round(payer.denialRate * 100)}%
@@ -463,7 +465,7 @@ export default function AnalyticsPage(): React.ReactElement {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-slate-900">
+            <CardTitle className="text-base text-white">
               Daily Claim Volume
             </CardTitle>
             <CardDescription>
@@ -490,23 +492,18 @@ export default function AnalyticsPage(): React.ReactElement {
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
-                    stroke="#e2e8f0"
+                    stroke={CHART_GRID}
                   />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
                   />
                   <Tooltip
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: "1px solid #e2e8f0",
-                      fontSize: 12,
-                      boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
-                    }}
+                    contentStyle={CHART_TOOLTIP}
                   />
                   <Area
                     type="monotone"
