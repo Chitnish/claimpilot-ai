@@ -88,7 +88,7 @@ export default function PatientsPage(): React.ReactElement {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Directory
         </p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white">
           Patients
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -105,7 +105,7 @@ export default function PatientsPage(): React.ReactElement {
           placeholder="Search by name, member ID, payer, or phone…"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-brand/40 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand/10"
+          className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.03] pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-brand/40 focus:bg-white/[0.03] focus:outline-none focus:ring-4 focus:ring-brand/10"
         />
       </Reveal>
 
@@ -157,13 +157,13 @@ export default function PatientsPage(): React.ReactElement {
                         {initial}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-display font-semibold text-slate-900">
+                        <p className="truncate font-display font-semibold text-white">
                           {name}
                         </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
+                        <p className="mt-0.5 text-xs text-slate-400">
                           DOB {formatDate(patient.dob)}
                         </p>
-                        <p className="font-mono text-xs text-slate-500">
+                        <p className="font-mono text-xs text-slate-400">
                           {displayText(patient.memberId)}
                         </p>
                       </div>
@@ -172,26 +172,26 @@ export default function PatientsPage(): React.ReactElement {
                     <div className="mt-3">
                       <Badge
                         variant="outline"
-                        className="border-blue-200 bg-blue-100 text-blue-800"
+                        className="border-blue-500/25 bg-blue-500/15 text-blue-300"
                       >
                         {displayText(patient.payerName)}
                       </Badge>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-4">
                       <div>
-                        <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                        <p className="text-[11px] uppercase tracking-wide text-slate-400">
                           Total claims
                         </p>
-                        <p className="font-display text-lg font-bold tabular-nums text-slate-900">
+                        <p className="font-display text-lg font-bold tabular-nums text-white">
                           {patient.totalClaims}
                         </p>
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                        <p className="text-[11px] uppercase tracking-wide text-slate-400">
                           Total billed
                         </p>
-                        <p className="font-display text-lg font-bold tabular-nums text-slate-900">
+                        <p className="font-display text-lg font-bold tabular-nums text-white">
                           {formatCurrency(patient.totalBilled)}
                         </p>
                       </div>
@@ -219,7 +219,7 @@ export default function PatientsPage(): React.ReactElement {
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
                 aria-label="Previous page"
-                className="inline-flex items-center rounded-md border border-border bg-white px-2 py-1 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                className="inline-flex items-center rounded-md border border-border bg-white/[0.03] px-2 py-1 transition-colors hover:bg-white/[0.03] disabled:opacity-40"
               >
                 <ChevronLeft className="size-4" />
               </button>
@@ -231,7 +231,7 @@ export default function PatientsPage(): React.ReactElement {
                 disabled={page + 1 >= pageCount}
                 onClick={() => setPage((p) => p + 1)}
                 aria-label="Next page"
-                className="inline-flex items-center rounded-md border border-border bg-white px-2 py-1 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                className="inline-flex items-center rounded-md border border-border bg-white/[0.03] px-2 py-1 transition-colors hover:bg-white/[0.03] disabled:opacity-40"
               >
                 <ChevronRight className="size-4" />
               </button>
