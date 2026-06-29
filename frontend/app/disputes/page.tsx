@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Bot,
   CheckCircle2,
   Loader2,
+  MessageSquare,
   MessageSquareWarning,
   ShieldCheck,
+  User,
 } from "lucide-react";
 
 import { getPendingDisputes, resolveDispute } from "@/lib/api";
@@ -22,6 +25,8 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StatCard } from "@/components/ui/stat-card";
+import { CountUp, Stagger, StaggerItem } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 15_000;
@@ -120,16 +125,30 @@ export default function DisputesPage(): React.ReactElement {
     }
   };
 
+  const distinctCarcs = new Set(
+    items.map((item) => item.carcCode).filter(Boolean),
+  ).size;
+  const totalMessages = items.reduce(
+    (sum, item) => sum + item.disputeThread.length,
+    0,
+  );
+
   return (
     <div className="p-6 lg:p-8">
       <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Appeals
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-3">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
             Pending Disputes
           </h1>
           <Badge
             variant="outline"
-            className="border-amber-200 bg-amber-100 text-amber-800"
+            className={cn(
+              "border-amber-200 bg-amber-100 text-amber-800",
+              items.length > 0 && "animate-status-pulse",
+            )}
           >
             {items.length} pending
           </Badge>
@@ -138,6 +157,38 @@ export default function DisputesPage(): React.ReactElement {
           Appeal email threads flagged for human review
         </p>
       </div>
+
+      {items.length > 0 && (
+        <Stagger className="mb-6 grid gap-4 sm:grid-cols-3">
+          <StaggerItem>
+            <StatCard
+              label="Awaiting Resolution"
+              value={<CountUp value={items.length} />}
+              subtitle="Threads flagged for a human decision"
+              icon={MessageSquareWarning}
+              accent="amber"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              label="Denial Codes"
+              value={<CountUp value={distinctCarcs} />}
+              subtitle="Distinct CARC codes in dispute"
+              icon={ShieldCheck}
+              accent="purple"
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <StatCard
+              label="Thread Messages"
+              value={<CountUp value={totalMessages} />}
+              subtitle="Total payer / AI correspondence"
+              icon={MessageSquare}
+              accent="blue"
+            />
+          </StaggerItem>
+        </Stagger>
+      )}
 
       {loading && items.length === 0 ? (
         <div className="flex justify-center py-16">
@@ -152,18 +203,23 @@ export default function DisputesPage(): React.ReactElement {
           description="Appeal threads that need a human decision will show up here."
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <Stagger className="grid gap-4 lg:grid-cols-2">
           {items.map((item) => {
             const previews = previewMessages(item);
             const isActing = actingOn === item.id;
 
             return (
+              <StaggerItem key={item.id}>
               <Card
-                key={item.id}
-                className="cursor-pointer transition-shadow hover:shadow-card-hover"
+                className="card-lift relative h-full cursor-pointer overflow-hidden"
                 onClick={() => router.push(`/claims/${item.claimId}`)}
               >
-                <CardHeader className="pb-3">
+                {/* Dispute triage bar */}
+                <span
+                  className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500"
+                  aria-hidden
+                />
+                <CardHeader className="pb-3 pt-5">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <CardTitle className="text-base text-slate-900">
@@ -184,41 +240,65 @@ export default function DisputesPage(): React.ReactElement {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {previews.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-slate-500">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                        <MessageSquare className="size-3.5" />
                         Recent thread
                       </p>
-                      {previews.map((msg, index) => {
-                        const isAi = msg.sender === "ai_reply";
-                        return (
-                          <div
-                            key={`${msg.sender}-${index}`}
-                            className={cn(
-                              "rounded-lg p-2.5 text-sm",
-                              isAi
-                                ? "border-l-2 border-blue-400 bg-blue-50"
-                                : "bg-slate-100",
-                            )}
-                          >
-                            <p
+                      <div className="space-y-2.5">
+                        {previews.map((msg, index) => {
+                          const isAi = msg.sender === "ai_reply";
+                          return (
+                            <div
+                              key={`${msg.sender}-${index}`}
                               className={cn(
-                                "mb-0.5 text-xs font-semibold",
-                                isAi ? "text-blue-700" : "text-slate-600",
+                                "flex items-start gap-2",
+                                isAi ? "flex-row-reverse" : "flex-row",
                               )}
                             >
-                              {senderLabel(msg.sender)}
-                              {msg.createdAt && (
-                                <span className="ml-2 font-normal text-slate-400">
-                                  {formatTimestamp(msg.createdAt)}
-                                </span>
-                              )}
-                            </p>
-                            <p className="line-clamp-1 text-slate-700">
-                              {msg.messageText}
-                            </p>
-                          </div>
-                        );
-                      })}
+                              <span
+                                className={cn(
+                                  "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ring-1",
+                                  isAi
+                                    ? "bg-gradient-to-br from-brand to-brand-dark text-white ring-white/30"
+                                    : "bg-white text-slate-500 ring-slate-200",
+                                )}
+                              >
+                                {isAi ? (
+                                  <Bot className="size-3" />
+                                ) : (
+                                  <User className="size-3" />
+                                )}
+                              </span>
+                              <div
+                                className={cn(
+                                  "min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-sm",
+                                  isAi
+                                    ? "bg-brand/10 text-right"
+                                    : "bg-white ring-1 ring-slate-200",
+                                )}
+                              >
+                                <p
+                                  className={cn(
+                                    "text-[11px] font-semibold",
+                                    isAi ? "text-brand-dark" : "text-slate-600",
+                                  )}
+                                >
+                                  {senderLabel(msg.sender)}
+                                  {msg.createdAt && (
+                                    <span className="ml-1.5 font-normal text-slate-400">
+                                      {formatTimestamp(msg.createdAt)}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="line-clamp-1 text-slate-700">
+                                  {msg.messageText}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -246,8 +326,7 @@ export default function DisputesPage(): React.ReactElement {
                   </div>
 
                   <Button
-                    variant="outline"
-                    className="w-full"
+                    className="press w-full bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-sm shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-700"
                     disabled={isActing}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -265,9 +344,10 @@ export default function DisputesPage(): React.ReactElement {
                   </Button>
                 </CardContent>
               </Card>
+              </StaggerItem>
             );
           })}
-        </div>
+        </Stagger>
       )}
 
       {toast && (
