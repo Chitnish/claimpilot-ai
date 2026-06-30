@@ -46,7 +46,19 @@ import {
 } from "@/components/ui/table";
 
 const REFRESH_INTERVAL_MS = 30_000;
-const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-500";
+const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-400";
+
+// Dark chart styling.
+const CHART_AXIS = "#94a3b8";
+const CHART_GRID = "rgba(148,163,184,0.12)";
+const CHART_TOOLTIP = {
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.1)",
+  background: "#131c30",
+  color: "#e8eef7",
+  fontSize: 12,
+  boxShadow: "0 12px 30px -12px rgba(0,0,0,0.7)",
+} as const;
 
 const BUCKET_ORDER = ["0-30", "31-60", "61-90", "90+"] as const;
 
@@ -67,15 +79,15 @@ const BUCKET_BAR_COLOR: Record<string, string> = {
 function bucketBadgeClass(bucket: string): string {
   switch (bucket) {
     case "0-30":
-      return "bg-emerald-100 text-emerald-800 border-emerald-200";
+      return "bg-emerald-500/15 text-emerald-300 border-emerald-500/25";
     case "31-60":
-      return "bg-amber-100 text-amber-800 border-amber-200";
+      return "bg-amber-500/15 text-amber-300 border-amber-500/25";
     case "61-90":
-      return "bg-orange-100 text-orange-800 border-orange-200";
+      return "bg-orange-500/15 text-orange-300 border-orange-500/25";
     case "90+":
-      return "bg-red-100 text-red-800 border-red-200";
+      return "bg-red-500/15 text-red-300 border-red-500/25";
     default:
-      return "bg-slate-100 text-slate-700 border-slate-200";
+      return "bg-white/[0.06] text-slate-200 border-white/10";
   }
 }
 
@@ -137,7 +149,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Collections
         </p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white">
           Accounts Receivable
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -149,15 +161,15 @@ export default function AccountsReceivablePage(): React.ReactElement {
       {/* Financial urgency banner */}
       {overdueAmount > 0 && (
         <Reveal className="mb-6">
-          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-rose-50 p-4 shadow-sm">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600 ring-1 ring-red-200">
+          <div className="flex items-start gap-3 rounded-2xl border border-red-500/25 bg-gradient-to-r from-red-500/10 to-rose-500/10 p-4 shadow-sm">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-500/15 text-red-400 ring-1 ring-red-500/25">
               <AlertTriangle className="size-5" />
             </span>
             <div className="text-sm">
-              <p className="font-semibold text-red-800">
+              <p className="font-semibold text-red-300">
                 {formatCurrency(overdueAmount)} in balances over 90 days
               </p>
-              <p className="mt-0.5 text-red-700">
+              <p className="mt-0.5 text-red-300">
                 {overdueBucket?.count ?? 0} account
                 {(overdueBucket?.count ?? 0) === 1 ? "" : "s"} at high collection
                 risk
@@ -197,7 +209,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
       <Reveal className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-base text-slate-900">
+            <CardTitle className="text-base text-white">
               Aging Buckets
             </CardTitle>
             <CardDescription>Patient balance by days outstanding</CardDescription>
@@ -208,22 +220,17 @@ export default function AccountsReceivablePage(): React.ReactElement {
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
-                  stroke="#e2e8f0"
+                  stroke={CHART_GRID}
                 />
                 <XAxis
                   dataKey="bucket"
-                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tick={{ fontSize: 11, fill: CHART_AXIS }}
                 />
-                <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
+                <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} />
                 <Tooltip
                   formatter={(value) => formatCurrency(Number(value))}
-                  cursor={{ fill: "rgba(15,23,42,0.04)" }}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid #e2e8f0",
-                    fontSize: 12,
-                    boxShadow: "0 10px 30px -12px rgba(15,23,42,0.25)",
-                  }}
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  contentStyle={CHART_TOOLTIP}
                 />
                 <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={56}>
                   {chartData.map((entry) => (
@@ -240,7 +247,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base text-slate-900">
+            <CardTitle className="text-base text-white">
               Outstanding Patient Balances
             </CardTitle>
             <CardDescription>
@@ -258,7 +265,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
             ) : (
               <div className="overflow-hidden rounded-lg border border-border">
                 <Table>
-                  <TableHeader className="bg-slate-50">
+                  <TableHeader className="bg-white/[0.03]">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className={thClass}>Account</TableHead>
                       <TableHead className={thClass}>Payer</TableHead>
@@ -280,22 +287,22 @@ export default function AccountsReceivablePage(): React.ReactElement {
                           className={cn(
                             "group",
                             overdue
-                              ? "bg-red-50/70 hover:bg-red-50"
-                              : "odd:bg-white even:bg-slate-50/50 hover:bg-brand/[0.05]",
+                              ? "bg-red-500/10 hover:bg-red-500/10"
+                              : "odd:bg-transparent even:bg-white/[0.03] hover:bg-brand/[0.05]",
                           )}
                         >
                           <TableCell>
                             <Link
                               href={`/claims/${a.claimId}`}
-                              className="inline-block rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-xs font-medium text-brand transition-colors hover:border-brand/40 hover:bg-sky-50"
+                              className="inline-block rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-xs font-medium text-brand transition-colors hover:border-brand/40 hover:bg-sky-500/10"
                             >
                               {a.claimId.slice(0, 8).toUpperCase()}
                             </Link>
                           </TableCell>
-                          <TableCell className="text-sm text-slate-700">
+                          <TableCell className="text-sm text-slate-200">
                             {a.payerName || "—"}
                           </TableCell>
-                          <TableCell className="text-right text-sm tabular-nums text-slate-700">
+                          <TableCell className="text-right text-sm tabular-nums text-slate-200">
                             {a.ageDays}d
                           </TableCell>
                           <TableCell>
@@ -312,7 +319,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
                           <TableCell
                             className={cn(
                               "text-right font-bold tabular-nums",
-                              overdue ? "text-red-700" : "text-slate-900",
+                              overdue ? "text-red-300" : "text-white",
                             )}
                           >
                             {formatCurrency(a.balance)}
