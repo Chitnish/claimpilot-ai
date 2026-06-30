@@ -372,4 +372,4 @@ This project uses **synthetic data only**. No real protected health information 
 
 ## Author
 
-Anish Chitnis — Software Engineering Intern, Ampcus Inc.
+Anish Chitnis — AI Engineering Intern, Ampcus Inc.
