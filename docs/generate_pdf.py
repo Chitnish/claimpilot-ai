@@ -349,7 +349,7 @@ def build_pdf():
         topMargin=0.75 * inch,
         bottomMargin=0.85 * inch,
         title="ClaimPilot AI Technical Documentation",
-        author="ClaimPilot AI Engineering",
+        author="Anish Chitnis",
     )
 
     toc = TableOfContents()
@@ -373,7 +373,7 @@ def build_pdf():
     story.append(Paragraph("ClaimPilot AI", styles["title"]))
     story.append(Paragraph("Complete Technical Documentation", styles["title"]))
     story.append(Spacer(1, 0.4 * inch))
-    story.append(Paragraph("Author: ClaimPilot AI Engineering Team", styles["subtitle"]))
+    story.append(Paragraph("Author: Anish Chitnis", styles["subtitle"]))
     story.append(Paragraph("Date: June 30, 2026", styles["subtitle"]))
     story.append(Paragraph("Version: 0.2.0 (API) / 0.1.0 (frontend package)", styles["subtitle"]))
     story.append(Spacer(1, 0.6 * inch))

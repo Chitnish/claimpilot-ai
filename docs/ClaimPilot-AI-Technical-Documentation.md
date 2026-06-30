@@ -1,6 +1,6 @@
 # ClaimPilot AI — Complete Technical Documentation
 
-**Author:** ClaimPilot AI Engineering Team  
+**Author:** Anish Chitnis  
 **Date:** June 30, 2026  
 **Version:** Backend API 0.2.0 · Frontend package 0.1.0
 
