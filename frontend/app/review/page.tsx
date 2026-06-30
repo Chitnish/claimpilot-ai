@@ -243,7 +243,7 @@ export default function ReviewPage(): React.ReactElement {
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-white">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
               Review Queue
             </h1>
             <Badge
@@ -417,7 +417,7 @@ export default function ReviewPage(): React.ReactElement {
                       <p className="text-[11px] uppercase tracking-wide text-slate-400">
                         Total charge
                       </p>
-                      <p className="font-display text-xl font-bold tabular-nums text-white">
+                      <p className="font-display text-xl font-semibold tabular-nums text-white">
                         {formatCurrency(item.totalCharge)}
                       </p>
                     </div>
@@ -435,7 +435,7 @@ export default function ReviewPage(): React.ReactElement {
                       </span>
                       <span
                         className={cn(
-                          "inline-flex items-center rounded-lg px-2.5 py-1 font-display text-xl font-bold tabular-nums",
+                          "inline-flex items-center rounded-lg px-2.5 py-1 font-display text-xl font-semibold tabular-nums",
                           tier.chip,
                           tier.alarm && "animate-status-pulse-danger",
                         )}

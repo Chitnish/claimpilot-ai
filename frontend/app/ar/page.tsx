@@ -54,8 +54,8 @@ const CHART_GRID = "rgba(148,163,184,0.12)";
 const CHART_TOOLTIP = {
   borderRadius: 12,
   border: "1px solid rgba(255,255,255,0.1)",
-  background: "#131c30",
-  color: "#e8eef7",
+  background: "#161619",
+  color: "#ededf0",
   fontSize: 12,
   boxShadow: "0 12px 30px -12px rgba(0,0,0,0.7)",
 } as const;
@@ -149,7 +149,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Collections
         </p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white">
+        <h1 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-white">
           Accounts Receivable
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -236,7 +236,7 @@ export default function AccountsReceivablePage(): React.ReactElement {
                   {chartData.map((entry) => (
                     <Cell
                       key={entry.raw}
-                      fill={BUCKET_BAR_COLOR[entry.raw] ?? "#0ea5e9"}
+                      fill={BUCKET_BAR_COLOR[entry.raw] ?? "#3b82f6"}
                     />
                   ))}
                 </Bar>

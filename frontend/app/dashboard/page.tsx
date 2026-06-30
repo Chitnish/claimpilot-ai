@@ -65,7 +65,7 @@ import {
 const POLL_INTERVAL_MS = 10_000;
 const MANUAL_HOURS_PER_CLAIM = 2.5;
 const BILLING_STAFF_HOURLY_RATE = 45;
-const CHART_PRIMARY = "#0ea5e9";
+const CHART_PRIMARY = "#3b82f6";
 
 // Whole-dollar formatter for headline figures (cleaner during count-up).
 const usd0 = (n: number): string =>
@@ -92,8 +92,8 @@ const CHART_GRID = "rgba(148,163,184,0.12)";
 const CHART_TOOLTIP = {
   borderRadius: 12,
   border: "1px solid rgba(255,255,255,0.1)",
-  background: "#131c30",
-  color: "#e8eef7",
+  background: "#161619",
+  color: "#ededf0",
   fontSize: 12,
   boxShadow: "0 12px 30px -12px rgba(0,0,0,0.7)",
 } as const;
@@ -150,7 +150,7 @@ function HeroMetric({
         <Icon className="size-3.5 text-brand" />
         {label}
       </div>
-      <p className="mt-2 font-display text-2xl font-bold tracking-tight text-white">
+      <p className="mt-2 font-display text-2xl font-semibold tracking-tight text-white">
         {children}
       </p>
     </div>
@@ -245,7 +245,7 @@ export default function DashboardPage(): React.ReactElement {
                     Revenue Cycle Command Center
                   </span>
                 </div>
-                <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
                   {ORG_NAME}
                 </h1>
                 <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
@@ -371,7 +371,7 @@ export default function DashboardPage(): React.ReactElement {
                   <DollarSign className="size-4 text-emerald-300" />
                   Cost Savings
                 </div>
-                <p className="mt-1 font-display text-4xl font-bold tracking-tight">
+                <p className="mt-1 font-display text-4xl font-semibold tracking-tight">
                   <span className="text-gradient-brand">
                     <CountUp value={costSavings} format={usd0} />
                   </span>
@@ -385,7 +385,7 @@ export default function DashboardPage(): React.ReactElement {
                 </div>
                 <div>
                   <p className="text-sm text-slate-400">FTE Hours Saved</p>
-                  <p className="mt-0.5 font-display text-2xl font-bold tracking-tight text-white">
+                  <p className="mt-0.5 font-display text-2xl font-semibold tracking-tight text-white">
                     <CountUp
                       value={fteHoursSaved}
                       format={(n) => `${n.toFixed(1)} hrs`}
@@ -403,7 +403,7 @@ export default function DashboardPage(): React.ReactElement {
                 </div>
                 <div>
                   <p className="text-sm text-slate-400">Denial Rate</p>
-                  <p className="mt-0.5 font-display text-2xl font-bold tracking-tight text-white">
+                  <p className="mt-0.5 font-display text-2xl font-semibold tracking-tight text-white">
                     {analytics.adjudicatedCount > 0 ? (
                       <CountUp value={denialPct} format={pct} />
                     ) : (
@@ -441,8 +441,8 @@ export default function DashboardPage(): React.ReactElement {
                 <BarChart data={statusData} margin={{ left: 0, right: 8 }}>
                   <defs>
                     <linearGradient id="barBrand" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#38bdf8" />
-                      <stop offset="100%" stopColor="#0284c7" />
+                      <stop offset="0%" stopColor="#60a5fa" />
+                      <stop offset="100%" stopColor="#2563eb" />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -463,7 +463,7 @@ export default function DashboardPage(): React.ReactElement {
                     tick={{ fontSize: 11, fill: CHART_AXIS }}
                   />
                   <Tooltip
-                    cursor={{ fill: "rgba(14,165,233,0.06)" }}
+                    cursor={{ fill: "rgba(59,130,246,0.06)" }}
                     contentStyle={CHART_TOOLTIP}
                   />
                   <Bar
@@ -508,8 +508,8 @@ export default function DashboardPage(): React.ReactElement {
                       <stop offset="100%" stopColor="#ef4444" />
                     </linearGradient>
                     <linearGradient id="riskFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.22} />
-                      <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.22} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid

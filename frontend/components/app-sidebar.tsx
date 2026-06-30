@@ -265,7 +265,7 @@ export function AppSidebar({
                       "group relative flex items-center rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200",
                       collapsed ? "justify-center" : "gap-2.5",
                       active
-                        ? "bg-gradient-to-r from-brand/20 via-brand/[0.08] to-transparent text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.07)] before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-brand before:shadow-[0_0_12px_rgba(14,165,233,0.75)]"
+                        ? "bg-gradient-to-r from-brand/20 via-brand/[0.08] to-transparent text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.07)] before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-brand before:shadow-[0_0_12px_rgba(59,130,246,0.75)]"
                         : "text-slate-400 hover:bg-white/5 hover:text-white",
                     )}
                   >

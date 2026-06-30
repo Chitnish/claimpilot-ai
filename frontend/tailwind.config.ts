@@ -38,15 +38,15 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        // Enterprise clinical palette
+        // Near-black neutral surfaces (Solaris-tuned)
         clinical: {
-          shell: "#0a0f1e", // app shell / deepest
-          sidebar: "#0d1426", // sidebar surface
-          content: "#f1f5f9", // page content canvas
+          shell: "#0a0a0c", // app shell / deepest
+          sidebar: "#0d0d11", // sidebar surface
+          content: "#0a0a0c", // page content canvas
         },
         brand: {
-          DEFAULT: "#0ea5e9", // clinical sky blue (accent)
-          dark: "#0369a1", // hover / pressed
+          DEFAULT: "#3b82f6", // royal blue accent (sole saturated color)
+          dark: "#2563eb", // hover / pressed
         },
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -96,14 +96,13 @@ const config: Config = {
         ],
       },
       boxShadow: {
-        // Depth tuned for the near-black canvas (black-based, not navy).
-        card: "0 1px 2px rgba(0,0,0,0.4)",
-        "card-hover": "0 8px 24px -12px rgba(0,0,0,0.55)",
-        elevated:
-          "0 1px 2px rgba(0,0,0,0.4), 0 12px 30px -14px rgba(0,0,0,0.55)",
-        float: "0 28px 60px -20px rgba(0,0,0,0.7)",
+        // Minimal depth — Solaris defines surfaces with borders, not shadow.
+        card: "0 1px 2px rgba(0,0,0,0.3)",
+        "card-hover": "0 6px 20px -12px rgba(0,0,0,0.5)",
+        elevated: "0 1px 2px rgba(0,0,0,0.35)",
+        float: "0 20px 48px -24px rgba(0,0,0,0.6)",
         "glow-brand":
-          "0 0 0 1px rgba(14,165,233,0.22), 0 12px 32px -10px rgba(14,165,233,0.40)",
+          "0 0 0 1px rgba(59,130,246,0.22), 0 12px 32px -10px rgba(59,130,246,0.35)",
       },
       borderRadius: {
         "2xl": "1rem",

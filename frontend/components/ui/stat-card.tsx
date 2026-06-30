@@ -12,67 +12,51 @@ export type StatAccent =
   | "slate";
 
 interface AccentTheme {
-  /** Solid gradient icon chip (white glyph on saturated brand color). */
-  chip: string;
-  /** Colored ambient shadow under the chip. */
-  chipShadow: string;
-  /** Soft glow blob bled into the top-right corner. */
-  glow: string;
-  /** Thin top accent bar gradient. */
-  bar: string;
-  /** Tint for the label marker dot. */
-  dot: string;
+  /** Translucent icon-square fill. */
+  iconBg: string;
+  /** Accent-tinted glyph. */
+  iconText: string;
+  /** Hairline ring around the icon square. */
+  iconRing: string;
 }
 
+// Restrained, Solaris-style: a quiet translucent square with an accent glyph —
+// no saturated gradient chips, top bars, or glows.
 const ACCENTS: Record<StatAccent, AccentTheme> = {
   blue: {
-    chip: "from-sky-500 to-blue-600",
-    chipShadow: "shadow-blue-500/25",
-    glow: "bg-sky-400",
-    bar: "from-sky-500 to-blue-600",
-    dot: "bg-sky-500",
+    iconBg: "bg-blue-500/15",
+    iconText: "text-blue-300",
+    iconRing: "ring-blue-500/20",
   },
   green: {
-    chip: "from-emerald-500 to-teal-600",
-    chipShadow: "shadow-emerald-500/25",
-    glow: "bg-emerald-400",
-    bar: "from-emerald-500 to-teal-600",
-    dot: "bg-emerald-500",
+    iconBg: "bg-emerald-500/15",
+    iconText: "text-emerald-300",
+    iconRing: "ring-emerald-500/20",
   },
   amber: {
-    chip: "from-amber-400 to-orange-500",
-    chipShadow: "shadow-amber-500/25",
-    glow: "bg-amber-400",
-    bar: "from-amber-400 to-orange-500",
-    dot: "bg-amber-500",
+    iconBg: "bg-amber-500/15",
+    iconText: "text-amber-300",
+    iconRing: "ring-amber-500/20",
   },
   red: {
-    chip: "from-red-500 to-rose-600",
-    chipShadow: "shadow-red-500/25",
-    glow: "bg-red-400",
-    bar: "from-red-500 to-rose-600",
-    dot: "bg-red-500",
+    iconBg: "bg-red-500/15",
+    iconText: "text-red-300",
+    iconRing: "ring-red-500/20",
   },
   orange: {
-    chip: "from-orange-500 to-amber-600",
-    chipShadow: "shadow-orange-500/25",
-    glow: "bg-orange-400",
-    bar: "from-orange-500 to-amber-600",
-    dot: "bg-orange-500",
+    iconBg: "bg-orange-500/15",
+    iconText: "text-orange-300",
+    iconRing: "ring-orange-500/20",
   },
   purple: {
-    chip: "from-violet-500 to-purple-600",
-    chipShadow: "shadow-purple-500/25",
-    glow: "bg-violet-400",
-    bar: "from-violet-500 to-purple-600",
-    dot: "bg-violet-500",
+    iconBg: "bg-purple-500/15",
+    iconText: "text-purple-300",
+    iconRing: "ring-purple-500/20",
   },
   slate: {
-    chip: "from-slate-500 to-slate-700",
-    chipShadow: "shadow-slate-500/20",
-    glow: "bg-slate-400",
-    bar: "from-slate-400 to-slate-600",
-    dot: "bg-slate-500",
+    iconBg: "bg-white/[0.06]",
+    iconText: "text-slate-300",
+    iconRing: "ring-white/10",
   },
 };
 
@@ -88,9 +72,9 @@ interface StatCardProps {
 }
 
 /**
- * Premium KPI tile: layered raised surface, a saturated gradient icon chip,
- * a colored accent bar + ambient corner glow, and a large display numeral.
- * Pass a `<CountUp />` as `value` to animate the figure on reveal.
+ * KPI tile: a border-defined dark surface, a muted uppercase label, a large
+ * semibold numeral, and a quiet accent icon square. Pass a `<CountUp />` as
+ * `value` to animate the figure on reveal.
  */
 export function StatCard({
   label,
@@ -110,27 +94,12 @@ export function StatCard({
         className,
       )}
     >
-      {/* Top accent bar */}
-      <span
-        className={cn(
-          "absolute inset-x-0 top-0 h-1 bg-gradient-to-r opacity-90",
-          a.bar,
-        )}
-        aria-hidden
-      />
-      {/* Ambient corner glow */}
-      <span
-        className={cn("accent-glow -right-6 -top-6 size-24", a.glow)}
-        aria-hidden
-      />
-
-      <div className="relative flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            <span className={cn("size-1.5 rounded-full", a.dot)} aria-hidden />
+          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
             {label}
           </p>
-          <p className="mt-2 font-display text-[1.75rem] font-bold leading-none tracking-tight text-white">
+          <p className="mt-2.5 font-display text-[1.75rem] font-semibold leading-none tracking-tight text-white">
             {value}
           </p>
           {subtitle ? (
@@ -141,12 +110,13 @@ export function StatCard({
         </div>
         <div
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg ring-1 ring-white/20 transition-transform duration-200 group-hover:scale-105",
-            a.chip,
-            a.chipShadow,
+            "flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors",
+            a.iconBg,
+            a.iconText,
+            a.iconRing,
           )}
         >
-          <Icon className="size-5" />
+          <Icon className="size-[18px]" />
         </div>
       </div>
     </div>

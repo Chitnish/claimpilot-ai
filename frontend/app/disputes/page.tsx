@@ -140,7 +140,7 @@ export default function DisputesPage(): React.ReactElement {
           Appeals
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-2xl font-bold tracking-tight text-white">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
             Pending Disputes
           </h1>
           <Badge

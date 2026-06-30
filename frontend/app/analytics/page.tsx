@@ -52,7 +52,7 @@ import {
 } from "@/components/ui/table";
 
 const REFRESH_INTERVAL_MS = 30_000;
-const CHART_PRIMARY = "#0ea5e9";
+const CHART_PRIMARY = "#3b82f6";
 
 const thClass = "text-xs font-semibold uppercase tracking-wider text-slate-400";
 
@@ -62,8 +62,8 @@ const CHART_GRID = "rgba(148,163,184,0.12)";
 const CHART_TOOLTIP = {
   borderRadius: 12,
   border: "1px solid rgba(255,255,255,0.1)",
-  background: "#131c30",
-  color: "#e8eef7",
+  background: "#161619",
+  color: "#ededf0",
   fontSize: 12,
   boxShadow: "0 12px 30px -12px rgba(0,0,0,0.7)",
 } as const;
@@ -135,7 +135,7 @@ export default function AnalyticsPage(): React.ReactElement {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Performance Intelligence
         </p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white">
+        <h1 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-white">
           Analytics
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -354,8 +354,8 @@ export default function AnalyticsPage(): React.ReactElement {
                   <BarChart data={statusData} margin={{ left: 0, right: 8 }}>
                     <defs>
                       <linearGradient id="statusGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#38bdf8" />
-                        <stop offset="100%" stopColor="#0284c7" />
+                        <stop offset="0%" stopColor="#60a5fa" />
+                        <stop offset="100%" stopColor="#2563eb" />
                       </linearGradient>
                     </defs>
                     <CartesianGrid
@@ -376,7 +376,7 @@ export default function AnalyticsPage(): React.ReactElement {
                       tick={{ fontSize: 11, fill: CHART_AXIS }}
                     />
                     <Tooltip
-                      cursor={{ fill: "rgba(14,165,233,0.06)" }}
+                      cursor={{ fill: "rgba(59,130,246,0.06)" }}
                       contentStyle={CHART_TOOLTIP}
                     />
                     <Bar
@@ -485,8 +485,8 @@ export default function AnalyticsPage(): React.ReactElement {
                 >
                   <defs>
                     <linearGradient id="volumeFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid

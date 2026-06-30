@@ -88,7 +88,7 @@ export default function PatientsPage(): React.ReactElement {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Directory
         </p>
-        <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-white">
+        <h1 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-white">
           Patients
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">

@@ -303,11 +303,11 @@ export default function PatientDetailPage(): React.ReactElement {
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 font-display text-xl font-bold text-white shadow-lg shadow-blue-500/25 ring-1 ring-white/30">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 font-display text-xl font-semibold text-white shadow-lg shadow-blue-500/25 ring-1 ring-white/30">
               {(p.lastName || p.firstName || "?").charAt(0).toUpperCase()}
             </span>
             <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-white">
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
                 {fullName}
               </h1>
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
@@ -727,7 +727,7 @@ export default function PatientDetailPage(): React.ReactElement {
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-100">
                         {month}
                       </span>
-                      <span className="font-display text-xl font-bold leading-none">
+                      <span className="font-display text-xl font-semibold leading-none">
                         {day}
                       </span>
                     </div>

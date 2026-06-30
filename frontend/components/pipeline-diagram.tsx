@@ -26,7 +26,7 @@ const AGENT_COLORS: Record<AgentName, string> = {
 
 const HUMAN_REVIEW_COLOR = "#f59e0b";
 
-const IDLE_SURFACE = "#131c30"; // dark idle node surface
+const IDLE_SURFACE = "#17171c"; // dark idle node surface
 const IDLE_BORDER = "#334155"; // slate-700
 const IDLE_TEXT = "#94a3b8"; // slate-400
 const GREEN_ARROW = "#22c55e";
@@ -281,12 +281,12 @@ export function PipelineDiagram({
           7 AI Agents
         </span>
       </div>
-      <div className="relative bg-gradient-to-b from-[#0c1322] to-[#0a0f1e] p-5 sm:p-7">
+      <div className="relative bg-gradient-to-b from-[#101014] to-[#0a0a0d] p-5 sm:p-7">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 50% 0%, rgba(14,165,233,0.1), transparent 60%)",
+              "radial-gradient(circle at 50% 0%, rgba(59,130,246,0.1), transparent 60%)",
           }}
           aria-hidden
         />

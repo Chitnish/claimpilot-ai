@@ -295,7 +295,7 @@ export default function ClaimDetailPage(): React.ReactElement {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
               Claim Detail
             </p>
-            <h1 className="mt-1.5 flex flex-wrap items-center gap-2.5 font-display text-2xl font-bold tracking-tight text-white">
+            <h1 className="mt-1.5 flex flex-wrap items-center gap-2.5 font-display text-2xl font-semibold tracking-tight text-white">
               Claim
               <span className="rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-base font-medium text-slate-200">
                 {truncateId(claim.claimId, 12)}
@@ -1120,7 +1120,7 @@ export default function ClaimDetailPage(): React.ReactElement {
         <Reveal>
           <section className="mt-8">
             <div className="mb-4">
-              <h2 className="font-display text-xl font-bold tracking-tight text-white">
+              <h2 className="font-display text-xl font-semibold tracking-tight text-white">
                 Dispute Log
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">

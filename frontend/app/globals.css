@@ -3,31 +3,32 @@
 @tailwind utilities;
 
 @layer base {
-  /* ClaimPilot runs a single, unified dark theme everywhere (Solaris-style).
-     Surfaces are layered near-black navy; the brand sky is the only saturated
-     accent. `:root` and `.dark` hold identical values so the theme is stable
-     regardless of the `dark` class. */
+  /* ClaimPilot runs a single, unified dark theme everywhere (Solaris-tuned).
+     Surfaces are layered near-black *neutral* (not navy); definition comes
+     from hairline borders, not big elevation. A royal blue is the only
+     saturated accent, used sparingly. `:root` and `.dark` hold identical
+     values so the theme is stable regardless of the `dark` class. */
   :root,
   .dark {
-    --background: 222 39% 6%; /* #0a0e17 page canvas (deepest) */
-    --foreground: 213 50% 94%; /* #e8eef7 near-white */
-    --card: 222 43% 10%; /* #0f1626 raised surface */
-    --card-foreground: 213 50% 94%;
-    --popover: 221 43% 13%; /* #131c30 elevated (menus) */
-    --popover-foreground: 213 50% 94%;
-    --primary: 199 89% 50%; /* #0ea5e9 clinical sky — sole accent */
-    --primary-foreground: 222 47% 11%;
-    --secondary: 222 41% 16%; /* #18223a hover/secondary surface */
-    --secondary-foreground: 213 50% 94%;
-    --muted: 222 41% 16%;
-    --muted-foreground: 215 20% 65%; /* #94a3b8 slate-400 */
-    --accent: 222 41% 16%;
-    --accent-foreground: 213 50% 94%;
+    --background: 240 9% 4%; /* #0a0a0c near-black neutral canvas */
+    --foreground: 240 11% 93%; /* #ededf0 near-white */
+    --card: 240 8% 7%; /* #111114 barely-lifted surface */
+    --card-foreground: 240 11% 93%;
+    --popover: 240 8% 9%; /* #161619 elevated (menus) */
+    --popover-foreground: 240 11% 93%;
+    --primary: 217 91% 60%; /* #3b82f6 royal blue — sole accent */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 8% 12%; /* #1c1c21 hover/secondary surface */
+    --secondary-foreground: 240 11% 93%;
+    --muted: 240 8% 12%;
+    --muted-foreground: 240 5% 58%; /* #8e8e96 neutral gray */
+    --accent: 240 8% 12%;
+    --accent-foreground: 240 11% 93%;
     --destructive: 0 72% 51%; /* #ef4444 */
     --destructive-foreground: 0 0% 100%;
-    --border: 218 30% 17%; /* hairline ~#1e2840 */
-    --input: 218 28% 19%;
-    --ring: 199 89% 52%;
+    --border: 240 7% 15%; /* hairline ~#232328 */
+    --input: 240 7% 17%;
+    --ring: 217 91% 60%;
     --radius: 0.5rem;
     color-scheme: dark;
   }
@@ -50,17 +51,18 @@
      heavier weights / tighter tracking for headings. No second family. */
   .font-display {
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: -0.014em;
+    letter-spacing: -0.021em;
   }
 }
 
 @layer utilities {
-  /* Dark sidebar surface with subtle clinical depth (top glow + vertical sheen). */
+  /* Dark sidebar/console surface: near-black neutral with a faint blue top
+     glow + vertical sheen for restrained depth. */
   .sidebar-surface {
-    background-color: #0d1426;
+    background-color: #0d0d11;
     background-image:
-      radial-gradient(120% 60% at 50% -10%, rgba(14, 165, 233, 0.1), transparent 60%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(0, 0, 0, 0.18));
+      radial-gradient(120% 60% at 50% -10%, rgba(59, 130, 246, 0.08), transparent 60%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.22));
   }
 
   /* Slim, unobtrusive scrollbars for dense data regions. */
@@ -83,14 +85,13 @@
      (depth, metric reveals) + selective OLED dark for ops consoles.
      ───────────────────────────────────────────────────────────────── */
 
-  /* Premium raised card on dark: layered shadow + a faint top sheen so cards
-     visibly sit above the near-black canvas. */
+  /* Raised card on dark: Solaris relies on the hairline border for definition,
+     so keep elevation minimal — a faint top sheen + a soft drop only. */
   .surface-raised {
     background-color: hsl(var(--card));
     box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.4),
-      0 12px 30px -14px rgba(0, 0, 0, 0.6),
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+      0 1px 2px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
   }
 
   /* Hover-lift affordance for interactive cards (transform + opacity only). */
@@ -116,26 +117,22 @@
     transform: scale(0.98);
   }
 
-  /* Dark clinical hero: deep gradient + brand radial glows + grid texture. */
+  /* Hero panel: near-black neutral with a single restrained blue radial glow
+     (Solaris uses one soft accent wash, not a multi-color mesh). */
   .mesh-hero {
-    background-color: #0a0f1e;
+    background-color: #0b0b0e;
     background-image:
       radial-gradient(
-        120% 120% at 0% 0%,
-        rgba(14, 165, 233, 0.22),
-        transparent 45%
-      ),
-      radial-gradient(
-        100% 120% at 100% 0%,
-        rgba(99, 102, 241, 0.16),
+        120% 120% at 15% -10%,
+        rgba(59, 130, 246, 0.16),
         transparent 50%
       ),
       radial-gradient(
-        90% 140% at 85% 110%,
-        rgba(16, 185, 129, 0.12),
+        90% 120% at 100% 0%,
+        rgba(59, 130, 246, 0.08),
         transparent 55%
       ),
-      linear-gradient(160deg, #0d1426 0%, #0a0f1e 100%);
+      linear-gradient(160deg, #101014 0%, #0a0a0d 100%);
   }
 
   /* Faint engineering grid overlay — apply on a positioned ::before host. */
@@ -158,7 +155,7 @@
 
   /* Brand gradient clip-text for hero numerals / emphasis. */
   .text-gradient-brand {
-    background-image: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 55%, #6366f1 100%);
+    background-image: linear-gradient(135deg, #93b8fd 0%, #3b82f6 55%, #2563eb 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -210,10 +207,10 @@
   @keyframes status-pulse-brand {
     0%,
     100% {
-      box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.5);
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
     }
     50% {
-      box-shadow: 0 0 0 5px rgba(14, 165, 233, 0);
+      box-shadow: 0 0 0 5px rgba(59, 130, 246, 0);
     }
   }
 
