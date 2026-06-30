@@ -1,114 +1,237 @@
 # ClaimPilot AI
 
-Multi-agent AI system for end-to-end healthcare claims automation.
+Multi-agent AI platform for end-to-end medical claims automation — from superbill intake through payer adjudication, human review, appeals, dispute email handling, patient A/R, and analytics.
 
 ## Overview
 
-ClaimPilot AI automates the full medical claims lifecycle—from superbill intake through payer submission, payment reconciliation, patient A/R, and appeals—using a coordinated team of specialized AI agents. A LangGraph supervisor orchestrates seven agents over a shared typed `ClaimState`, combining GPT vision/reasoning (models from env vars) with a rules engine, deterministic payer adjudication, and ML models (denial-risk GradientBoosting, fraud Isolation Forest + cross-claim pattern signals).
+ClaimPilot AI targets the revenue-cycle workflow a medical billing office runs daily: extract data from a superbill, verify coverage, validate coding, scrub against payer edits, predict denial risk, submit to a payer, reconcile remittance, and collect patient balances. Rather than a single monolithic model, a **LangGraph supervisor** routes each claim through **seven specialized agents** over one shared, typed `ClaimState` object. GPT vision and reasoning handle unstructured document extraction, coding review, appeal letters, dispute replies, and the Review Copilot; deterministic rules and a mock payer engine enforce real billing edits (NCCI, MUE, modifier 25, timely filing, LCD medical necessity); scikit-learn models score denial risk (GradientBoosting + SHAP) and billing anomalies (Isolation Forest plus cross-claim fraud signals).
 
-Claims that need attention route to a human-in-the-loop (HITL) review queue with interrupt/resume. Reviewers act under a demo RBAC layer (biller / supervisor / manager), with every privileged action stamped to an append-only audit log. The claim detail page includes a **Review Copilot** grounded in that claim's pipeline state. Denied claims can be **corrected and resubmitted** (frequency code 7) or receive GPT-drafted appeal letters via email.
+Claims that hit defined risk gates pause at a **human-in-the-loop (HITL)** checkpoint implemented with LangGraph `interrupt`. Reviewers approve or reject via the UI under a demo **RBAC layer** (biller / supervisor / manager), with privileged actions written to an append-only **audit log**. Denied claims can receive GPT-drafted appeal letters sent through **Resend**, continue in an **AI-managed email dispute thread** (with escalation to human review), or be **corrected and resubmitted** as frequency-code-7 replacement claims. Patient profiles, appointments, documents, statements, and an A/R aging report extend the demo beyond claims-only processing.
+
+All patient and claim data is **synthetic**. This is an engineering prototype, not a certified production RCM product.
 
 ## Architecture
 
 ### Agent Pipeline
 
-| Agent | Role | Model/Method |
-|-------|------|--------------|
-| Intake | Vision extraction from superbills (PDF/image), incl. modifiers | Vision model + Pydantic structured outputs |
-| Eligibility | 270/271 coverage, benefits (copay/coinsurance/deductible), prior auth | Mock payer service with plan tiers |
-| Coding | ICD-10/CPT validation + medical necessity | Reasoning model |
-| Scrub | Pre-submission edits (NPI Luhn, NCCI, MUE, modifier 25/59, timely filing, LCD) + CMS-1500 + denial risk | Rules engine + GradientBoosting ML |
-| Submission | Adjudication against payer rules, CARC/RARC denials, appeal drafting | Deterministic adjudication engine + reasoning model + Resend email |
-| Reconciliation | Line-level 835/ERA posting, CO/PR/OA adjustments, variance detection, patient statements | Rules engine + PDF statement generator |
-| Fraud | Single-claim anomaly + cross-claim/provider pattern signals | Isolation Forest + statistical fraud engine |
+| Agent | Role | Method |
+|-------|------|--------|
+| **Intake** | Extract patient, payer, provider, DOS, and service lines (CPT, modifiers, ICD-10, charges) from uploaded superbill PDF/image; flag low-confidence header fields | GPT vision (`MODEL_VISION`) + Pydantic structured output |
+| **Eligibility** | Simulate 270/271: active coverage, plan tier, copay/coinsurance/deductible, prior-auth CPT list and auth-on-file flag; route terminated coverage to review | Deterministic mock payer (`check_eligibility`) |
+| **Coding** | Validate ICD-10/CPT format, medical-necessity linkage, modifier use, unbundling | GPT reasoning (`MODEL_REASONING`) + structured `CodingReview` |
+| **Scrub** | Pre-submission edits (NPI Luhn, identifiers, dates, NCCI, MUE, modifier 25/59, timely filing, prior auth, LCD); generate CMS-1500 PDF; score ML denial risk | Rules engine (`scrubber.py`) + GradientBoosting ML + ReportLab PDF |
+| **Submission** | Submit to mock clearinghouse; line-level adjudication; draft appeal letters for clinical denials or route administrative denials to review with corrective actions | Deterministic adjudication (`adjudicate_claim`) + GPT appeal drafting + Resend (manual send) |
+| **Reconciliation** | Parse simulated 835/ERA; compare expected vs paid; flag payment variance; open patient A/R and generate/email patient statement | Deterministic ERA (`generate_era`) + ReportLab statement PDF + Resend |
+| **Fraud** | Fuse single-claim Isolation Forest anomaly score with cross-claim signals (charge outlier, duplicate clone, E/M upcoding skew, volume spike) | ML + in-process statistical engine (`fraud_signals.py`) |
+
+**Supervisor routing** (`backend/app/graph/pipeline.py`): draft → intake (if document, no lines) → eligibility → coding → scrub → submission → reconciliation (once, when `era` empty) → fraud (terminal states, once) → end. **`human_review`** node calls LangGraph `interrupt` when `needs_human_review` is true; `/claims/{id}/resume` clears the flag and resumes the graph.
+
+### System Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Next.js frontend (localhost:3000)                                          │
+│  Dashboard · Claims · Upload · Review · Disputes · Patients · A/R · Analytics│
+└───────────────────────────────┬─────────────────────────────────────────────┘
+                                │ REST + SSE (agent events)
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FastAPI backend (localhost:8000)                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ LangGraph supervisor → Intake → Eligibility → Coding → Scrub →       │   │
+│  │ Submission → Reconciliation → Fraud (+ Human Review interrupt)       │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└───────┬─────────────────┬──────────────────┬──────────────────────────────┘
+        │                 │                  │
+        ▼                 ▼                  ▼
+  OpenAI API        Supabase Postgres     Supabase Storage
+  (vision/reason)   claims, patients,     claim-states/*.json
+                    agent_runs,           patient-documents/*
+                    review_queue,         cms1500 / statement PDFs (local disk)
+                    audit_log, …
+        │
+        ▼
+  Resend (outbound appeal + statement + dispute replies)
+        ▲
+        │ inbound webhook: POST /webhooks/resend-inbound
+        │
+┌───────┴───────────────────────────────────────────────────────────────────────┐
+│  Separate Render deployment (recommended for dispute demo)                    │
+│  Public HTTPS endpoint for Resend inbound emails → same Supabase project      │
+│  Local backend reads dispute_thread / has_pending_dispute from Storage        │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Tech Stack
 
-| Backend | Frontend |
-|---------|----------|
-| FastAPI | Next.js 14 (App Router) |
-| LangGraph (supervisor pattern) | TypeScript |
-| Pydantic v2 | Tailwind CSS + shadcn/ui |
-| scikit-learn + SHAP | Framer Motion + Recharts |
-| OpenAI (env-driven models) | SSE (multi-subscriber) |
-| Supabase (Postgres + Storage) | |
+| Backend (installed in `.venv`; `requirements.txt` lists unpinned deps) | Frontend (`frontend/package.json`) |
+|--------|----------|
+| Python 3.11 | Next.js **16.2.9** |
+| FastAPI **0.136.3** | React **19.2.7** / React DOM **19.2.7** |
+| Uvicorn **0.49.0** | TypeScript **^5** |
+| sse-starlette **3.4.4** | Tailwind CSS **3.4.1** |
+| Pydantic **2.13.4** | shadcn **4.11.0**, radix-ui **1.5.0** |
+| LangGraph **1.2.4**, langchain-openai **1.3.0** | Framer Motion **12.40.0**, Recharts **3.8.1** |
+| OpenAI **2.41.0** | react-dropzone **15.0.0**, react-markdown **10.1.0** |
+| scikit-learn **1.9.0**, SHAP **0.51.0** | Zod **4.4.3** |
+| Supabase Python **2.31.0** | @supabase/supabase-js **^2.108.1** |
+| Resend **2.30.1**, httpx **0.28.0** | Geist fonts (via `next/font`) |
+| ReportLab **4.5.1**, pdf2image **1.17.0**, pdfplumber **0.11.9** | ESLint **^8**, eslint-config-next **14.2.35** |
+| pandas **3.0.3**, numpy **2.4.6**, Faker **40.22.0** | |
 
-### Key Features
+## Key Features
 
-**Rules & adjudication**
-- Authentic NCCI pairs (incl. status-B edits like 99000, panel unbundling), MUE limits, modifier 25 on immunization admin (90471), timely filing, LCD medical necessity
-- Deterministic payer engine with real CARC/RARC codes and line-level 835s (CO/PR/OA)
-- Pre-submission scrubber with rule citations (NPI-03, NCCI-01, MOD-25, TFL-01…)
+### Claims Processing
 
-**ML**
-- Denial-risk model trained on adjudication-engine outcomes (not a hand-written formula)
-- SHAP explanations in billing-specialist language
-- Retrain after rule changes: `python -m app.ml.train` (artifacts: `backend/app/ml/*.pkl`, gitignored)
+- **Single upload** (`POST /claims/upload`) and **batch upload** (`POST /claims/upload-batch`): PDF/PNG/JPG superbills; one claim per file; parallel pipeline tasks.
+- **Real-time SSE feed** (`GET /claims/{id}/events`): multi-subscriber fan-out, backfill from Storage/`agent_runs`, survives tab refresh.
+- **Full claim detail** (`GET /claims/{id}`): rehydrates `ClaimState` from memory, Supabase Storage snapshot, or flat `claims` row.
+- **CMS-1500 PDF** (`GET /claims/{id}/cms1500`) generated at scrub; includes box 22 resubmission fields for corrected claims.
+- **Pipeline diagram** on claim detail: visual progress through all seven agents plus human-review pause.
+- **Corrected claims** (`POST /claims/{id}/correct`): frequency code **7** (replacement) or **8** (void); links `original_claim_id` and `original_payer_control_number`; re-enters pipeline at **coded**; audit trail on both claims.
+- **Claims work list** (`GET /claims/search`): text search (ID, payer, CARC), status/payer filters, pagination, payer facets.
+- **CSV export** (`GET /claims/export.csv`): same filters as work list.
 
-**Operations & compliance (Tier 1)**
-- **RBAC demo**: sidebar user switcher (biller / supervisor / manager); default role is **manager** so the standard demo works with zero extra clicks
-- **Audit trail**: append-only `audit_log` (approve/reject, PHI downloads, copilot access)
-- **Corrected claims**: frequency code 7 resubmission with lineage on claim detail
-- **Patient A/R**: itemized statements, `/ar` aging report (0–30 / 31–60 / 61–90 / 90+)
-- **Honest metrics**: clean-claim rate, touch rate, measured pipeline time — correct denominators on Dashboard and Analytics
-- **Work queue**: bulk approve/reject low-risk claims; CSV export on Claims work list
-- **SSE**: multiple browser tabs on the same claim receive live agent events simultaneously
+### Risk & Compliance
 
-**Persistence**
-- Full `ClaimState` snapshots in Supabase Storage after every pipeline step (survives backend restarts)
-- Flat `claims` table + optional Postgres migrations for audit, lineage, and A/R columns
-- Durable agent history in `agent_runs`
+- **Scrubber rules** with cited rule IDs:
+  - Identifiers: NPI-01/02/03 (Luhn), SUB-01–04 (member ID, name, DOB, payer)
+  - Dates: DOS-01–03, TFL-01/02 (timely filing vs payer-specific limits: 90–365 days)
+  - Lines: LN-01–04 (diagnosis pointer, charge, units)
+  - Codes: CPT-01/02, ICD-01/02, MOD-01–03
+  - NCCI-01 (99000 status-B bundling, 80053/80048 panel unbundling), MOD-25 (E/M + 90471 same day)
+  - MUE-01, AUTH-01, LCD-01 (medical necessity by diagnosis prefix)
+- **Denial-risk ML**: GradientBoosting trained on **8,000** synthetic claims through the real adjudication engine; training asserts **AUC > 0.75**; default threshold **0.60** (`DENIAL_RISK_THRESHOLD`); SHAP factors rendered in plain English.
+- **Anomaly / fraud**: Isolation Forest on charge/lines/dx/MUE shape; cross-claim signals for charge z-score, duplicate clone, E/M upcoding skew (≥80% level 4/5), improbable daily volume (≥15 claims/DOS/NPI).
+- **Mock payer adjudication**: deterministic by claim content (NPI, member ID, eligibility, filing age, duplicates, NCCI, MUE, modifier 25, LCD, prior auth); real CARC/RARC catalogs; line-level CO-45 contractual adjustment and PR-1/2/3 patient responsibility; ~10% intentional ERA underpayment for variance testing.
 
-**Reviewer experience**
-- Review Copilot (`POST /claims/{id}/chat`): grounded Q&A with citations and suggested actions
-- Claim detail: service lines, scrub findings, benefits, payment breakdown, fraud signals, reviewer decision notes
-- Batch upload (`POST /claims/upload-batch`): parallel pipelines per file
+### Human Oversight
+
+- **Review queue** (`GET /review`, `review_queue` table): open items with reason and details (denial risk, scrub errors, low-confidence fields, CARC corrective actions, reconciliation variance).
+- **HITL gates**: low extraction confidence (`CONFIDENCE_THRESHOLD` default **0.85**); scrub hard errors; denial risk ≥ threshold; terminated coverage; administrative denial; reconciliation variance > **5%** (`RECON_VARIANCE_TOLERANCE`).
+- **Approve / reject** (`POST /claims/{id}/resume`): approval resumes pipeline (restart point depends on review reason); rejection drafts appeal (CARC 50) or keeps in review; variance approval accepts posted payment and finalizes A/R.
+- **Bulk resume** (`POST /review/bulk-resume`): up to 100 claims; per-claim RBAC; partial failure safe.
+- **RBAC** (demo headers, not real auth):
+  - Roles: **biller**, **supervisor**, **manager** (default **manager** if header missing)
+  - Demo users: Jordan Lee (biller), Sam Rivera (supervisor), Alex Morgan (manager)
+  - Billers cannot approve: payment-variance write-offs; claims over **$500** (`BILLER_APPROVAL_MAX_CHARGE`); denial risk ≥ **75%** (`BILLER_APPROVAL_MAX_RISK`)
+  - Rejection always allowed for any role
+- **Audit log** (`audit_log` table, best-effort): `approve_claim`, `reject_claim`, `approve_denied`, `download_cms1500`, `download_statement`, `view_copilot`, `send_appeal_email`, `resolve_dispute`, `resubmit_corrected` — append-only via DB triggers.
+
+### Patient Management
+
+- **Auto-enrichment**: after pipeline, `upsert_patient_from_claim` creates/updates patient by member ID + payer; links claim via `encounters` row.
+- **Patient directory** (`GET /patients`): search by name, member ID, payer, phone; claim aggregates and last visit.
+- **Patient detail** (`GET /patients/{id}`): demographics, address, contacts, emergency contact, responsible party, primary/secondary insurance, notes; linked claims; appointments; documents with signed download URLs.
+- **CRUD**: `PUT /patients/{id}` profile update; `POST/DELETE` appointments; document metadata, upload (`POST .../documents/upload` to Storage), delete.
+
+### Financial Operations
+
+- **835/ERA reconciliation**: expected vs paid variance; line-level denials and underpayments; human review on tolerance breach.
+- **Patient A/R**: `patient_balance`, `ar_status` (`open` / `paid`), `statement_date` on claims; itemized **patient statement PDF**; optional **statement email** with PDF attachment after reconciliation.
+- **A/R aging** (`GET /ar/aging`): buckets **0–30**, **31–60**, **61–90**, **90+** days; total outstanding; open accounts list (requires migration 0004 columns).
+
+### Dispute Resolution
+
+- **Appeal drafting**: on clinical denials (CARC **50, 97, 151, 197, 11, 4, 96**) or reviewer rejection; plain-text letters via GPT.
+- **Send appeal** (`POST /claims/{id}/send-appeal`): Resend HTML email; subject `Appeal — Claim {id[:8]} — {patient}`; sets `appeal_email_sent`.
+- **Inbound dispute webhook** (`POST /webhooks/resend-inbound`): Resend `email.received` events; parses claim ID from subject; fetches body via Resend Receiving API; AI reply (`generate_dispute_reply`); persists thread to `dispute_threads` + Storage; sends threaded reply; **escalation** when payer replies affirmatively after AI's yes/no escalation question → `has_pending_dispute = true`.
+- **Pending disputes** (`GET /disputes/pending`); **resolve** (`POST /disputes/{id}/resolve`) clears flag with audit note.
+
+### Analytics
+
+- **`GET /analytics`** (last 1000 claims): total claims/billed; **denial rate** and **clean-claim rate** over adjudicated claims only; **touch rate** (claims in `review_queue` ÷ adjudicated); **auto-processed count**; **avg pipeline seconds** from summed `agent_runs.latency_ms`; **avg denial risk**; **high-risk open** count; status histogram; top CARC reasons; per-payer stats; 14-day daily volume; **business impact** estimate (12 min manual time × $45/hr on auto-processed claims — definitions returned in `metric_definitions`).
+- **Frontend `/analytics`**: KPI cards, status bar chart, CARC bar chart, payer table, daily volume area chart, metric definition footnotes.
+- **Dashboard `/dashboard`**: command-center hero, clean-claim/touchless/billed KPIs, recent claims table, denial-risk distribution (local bucket chart), polls every 10s.
+
+### Review Copilot
+
+- **`POST /claims/{id}/chat`**: grounded Q&A on single claim's `ClaimState` snapshot + last 20 agent events; structured response with `reply`, `citations`, `suggested_actions`; uses `MODEL_FAST` or `MODEL_REASONING` based on question triggers; audit logged as `view_copilot`.
+- **UI component** on claim detail with starter prompts and optional plain-language mode.
+
+## Database Schema
+
+Base tables (`orgs`, `claims`, `patients`, `encounters`, `agent_runs`, `review_queue`) are required in Supabase but are **not** created by repo migrations — they must exist before seeding or upload. Migrations in `backend/migrations/` are additive.
+
+| Table | Description |
+|-------|-------------|
+| `orgs` | Demo organization row referenced by claims, patients, and encounters |
+| `claims` | Flat claim work-list row: status, payer, charges, denial risk, CARC/RARC, appeal fields, reviewer fields, A/R columns, dispute flag, correction lineage columns |
+| `patients` | Patient demographics and insurance profile (extended by migration 0007) |
+| `encounters` | Links a claim to a patient, provider, and date of service |
+| `agent_runs` | Durable per-step agent activity: agent, event, summary, payload, latency_ms |
+| `review_queue` | Open/closed HITL queue items with reason and JSON details |
+| `claim_states` | *(migration 0001)* Optional Postgres JSONB snapshot of full `ClaimState`; app currently persists to **Storage** instead |
+| `audit_log` | *(0002)* Append-only attributable audit trail with immutability triggers |
+| `dispute_threads` | *(0006)* Email thread messages: sender (`payer_reply`, `ai_reply`), text, optional `resend_email_id` |
+| `patient_documents` | *(0007)* Document metadata + Storage path per patient |
+| `patient_appointments` | *(0007)* Scheduled/completed appointments per patient |
+
+**Storage bucket `documents`**: `claim-states/{claim_id}.json` (full pipeline state); `patient-documents/{patient_id}/…`.
+
+**Migration order**: `0001` → `0002` → `0003` → `0004` → `0005` → `0006` → `0007`. Single-paste script: `backend/migrations/combined_apply_all.sql` (all seven migrations; requires base tables to exist first).
 
 ## Setup
 
 ### Prerequisites
 
-- Windows + PowerShell
-- Python 3.11
-- Node.js 18+
-- Poppler (for PDF→image conversion; on PATH in `start-*.ps1`)
-- Supabase project
+- Windows + PowerShell (paths with parentheses must be quoted)
+- Python **3.11**
+- Node.js **18+**
+- **Poppler** on PATH for PDF→image intake (default probe: `C:\poppler\poppler-24.08.0\Library\bin`; override with `POPPLER_PATH`)
+- Supabase project with base tables, `documents` Storage bucket, and at least one `orgs` row
 - OpenAI API key
-- Resend API key (appeal emails)
+- Resend API key (appeals, statements, dispute replies; optional for core pipeline)
 
-### Backend
+### Backend setup
 
 ```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt --break-system-packages
+pip install -r requirements.txt
 ```
 
-Create `backend/.env`:
+Copy `backend/.env.example` to `backend/.env` and fill in values:
 
-```
+```env
+# Required
 OPENAI_API_KEY=
 SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
+
+# Email (appeals, statements, disputes)
 RESEND_API_KEY=
-MODEL_REASONING=
-MODEL_FAST=
-MODEL_VISION=
+ALERT_FROM_EMAIL=onboarding@resend.dev
+ALERT_TO_EMAIL=
+RESEND_INBOUND_ADDRESS=
+
+# Models (defaults shown)
+MODEL_REASONING=gpt-4o
+MODEL_FAST=gpt-4o-mini
+MODEL_VISION=gpt-4o-mini
+
+# Pipeline thresholds
 CONFIDENCE_THRESHOLD=0.85
 DENIAL_RISK_THRESHOLD=0.60
 RECON_VARIANCE_TOLERANCE=0.05
+
+# RBAC demo limits
+BILLER_APPROVAL_MAX_CHARGE=500
+BILLER_APPROVAL_MAX_RISK=0.75
+
+# Optional
+POPPLER_PATH=
+SUPABASE_DB_URL=
 ```
 
-`SUPABASE_DB_URL` is optional — only needed for `scripts/run_migrations.py` from your machine. If direct Postgres is unreachable from your network, apply migrations via the Supabase SQL Editor instead (see below).
-
-Train ML models (skip if `backend/app/ml/denial_model.pkl` already exists):
+Train ML models (skip if `backend/app/ml/denial_model.pkl` already present):
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.ml.train
 ```
 
-Start the API:
+Start API:
 
 ```powershell
 uvicorn app.main:app --reload --port 8000
@@ -116,20 +239,22 @@ uvicorn app.main:app --reload --port 8000
 
 Or from repo root: `.\start-backend.ps1`
 
-### Frontend
+Health check: `GET http://localhost:8000/health` → `{"status":"ok","version":"0.2.0"}`
+
+### Frontend setup
 
 ```powershell
 cd frontend
 npm install
 ```
 
-Create `frontend/.env.local`:
+Copy `frontend/.env.local.example` to `frontend/.env.local`:
 
-```
+```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-Start the dev server:
+Start dev server:
 
 ```powershell
 npm run dev
@@ -137,26 +262,32 @@ npm run dev
 
 Or from repo root: `.\start-frontend.ps1`
 
-### Database migrations
+App root `/` redirects to `/dashboard`.
 
-Four additive SQL migrations live in `backend/migrations/`. Apply once via **Supabase Dashboard → SQL Editor** (recommended if direct Postgres fails from your network):
+### Environment variables (reference)
 
-```
-0001_claim_states.sql   — durable ClaimState table (forward-looking; app still uses Storage)
-0002_audit_log.sql      — append-only audit trail
-0003_corrected_claims.sql — correction lineage columns on claims
-0004_patient_ar.sql     — patient balance / A/R columns on claims
-```
+| Variable | Purpose |
+|----------|---------|
+| `OPENAI_API_KEY` | Required. GPT vision, reasoning, fast, and copilot calls |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Required. Postgres + Storage client |
+| `SUPABASE_DB_URL` | Optional. Direct Postgres for `scripts/run_migrations.py` |
+| `RESEND_API_KEY` | Outbound/inbound email via Resend |
+| `ALERT_FROM_EMAIL` | Sender address (default `onboarding@resend.dev`) |
+| `ALERT_TO_EMAIL` | Demo recipient for appeals, statements, dispute replies |
+| `RESEND_INBOUND_ADDRESS` | Reply-To / inbound routing address for dispute threading |
+| `MODEL_REASONING`, `MODEL_FAST`, `MODEL_VISION` | OpenAI model slugs |
+| `CONFIDENCE_THRESHOLD` | Intake HITL gate (default 0.85) |
+| `DENIAL_RISK_THRESHOLD` | Scrub HITL gate (default 0.60) |
+| `RECON_VARIANCE_TOLERANCE` | Reconciliation variance fraction (default 0.05) |
+| `BILLER_APPROVAL_MAX_CHARGE`, `BILLER_APPROVAL_MAX_RISK` | RBAC biller approval limits |
+| `POPPLER_PATH` | pdf2image Poppler binaries directory |
+| `NEXT_PUBLIC_API_URL` | Frontend → backend base URL |
 
-A combined script is at `backend/migrations/combined_apply_all.sql`. Alternatively, from `backend/` with `SUPABASE_DB_URL` set:
+Request headers for demo identity (set automatically by frontend): `X-Actor-Id`, `X-Actor-Name`, `X-Actor-Role`.
 
-```powershell
-.\.venv\Scripts\python.exe scripts\run_migrations.py
-```
+### Seeding demo data
 
-### Seed & generate demo data
-
-**Flat dashboard rows** (review-queue filler, no full pipeline):
+**Dashboard filler** (10 flat claims + patients + appointments; no live pipeline):
 
 ```powershell
 cd backend
@@ -164,58 +295,81 @@ cd backend
 .\.venv\Scripts\python.exe data\synthetic\seed.py
 ```
 
-**Uploadable superbill images** (run through the live pipeline for rules, A/R, fraud, corrections):
+Statuses seeded: 3 reconciled, 2 needs_review, 2 appealed, 2 submitted, 1 denied.
+
+**Uploadable superbills** (PDF; mix of clean and deniable scenarios):
 
 ```powershell
 .\.venv\Scripts\python.exe data\synthetic\generate.py
+# optional: .\.venv\Scripts\python.exe data\synthetic\generate.py 5
 ```
 
-Outputs: `backend/data/synthetic/superbill_*.png` — upload via **Upload** in the UI.
+Upload outputs from `backend/data/synthetic/superbill_*.pdf` via **Upload** in the UI.
 
-### Smoke tests
+### Database migrations
+
+Apply in Supabase **SQL Editor** (recommended) or:
 
 ```powershell
 cd backend
-.\.venv\Scripts\Activate.ps1
-.\.venv\Scripts\python.exe tests\smoke_scrubber.py
-.\.venv\Scripts\python.exe tests\smoke_adjudication.py
-.\.venv\Scripts\python.exe tests\smoke_fraud.py
+.\.venv\Scripts\python.exe scripts\run_migrations.py
 ```
 
-## Demo walkthrough
+(requires `SUPABASE_DB_URL`)
 
-1. Start backend and frontend. Optionally run `seed.py` for dashboard filler, then `generate.py` and upload superbills for full-pipeline demos.
-2. **Dashboard** (`/dashboard`) — honest KPIs: clean-claim rate, denial rate, touch rate, measured processing time, estimated labor savings (with assumptions labeled).
-3. **Upload** (`/upload`) — drop one or more superbill PNGs/PDFs; each file runs its own parallel pipeline. Open the claim detail page and watch the SSE live feed.
-4. **SSE multi-tab test** — open the same `/claims/{id}` URL in two browser tabs while processing; both should show agent events updating in real time.
-5. **Review Queue** (`/review`) — approve or reject flagged claims (optional comment). Use checkboxes + **Select low-risk** + **Approve selected** for bulk actions. Default actor is **manager** (Alex Morgan) — no switcher interaction required for the happy path.
-6. **RBAC** — switch sidebar to **Jordan Lee (biller)** and try approving a high-dollar or high-risk claim; switch to supervisor/manager to clear it.
-7. **Claim detail** — scrub findings, denial-risk SHAP factors, fraud `anomaly_reasons`, Review Copilot, CMS-1500 download, corrected-claim panel (on denied claims), patient statement (after reconciliation).
-8. **Accounts Receivable** (`/ar`) — aging buckets and open patient balances (populated after claims reconcile with patient responsibility).
-9. **Claims** (`/claims`) — search, filter, paginate, **Export CSV**.
-10. **Analytics** (`/analytics`) — operational KPIs, CARC breakdown, payer performance, daily volume.
+## Demo Flow
 
-## API highlights
+A realistic end-to-end walkthrough using actual routes:
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /claims/upload` | Single superbill upload |
-| `POST /claims/upload-batch` | Parallel multi-file upload |
-| `GET /claims/{id}/events` | SSE live agent feed |
-| `POST /claims/{id}/resume` | HITL approve/reject (RBAC-gated) |
-| `POST /review/bulk-resume` | Bulk approve/reject |
-| `POST /claims/{id}/correct` | Corrected claim (freq 7) |
-| `POST /claims/{id}/chat` | Review Copilot |
-| `GET /claims/export.csv` | Filtered work-list export |
-| `GET /ar/aging` | Patient A/R aging report |
-| `GET /analytics` | Operational metrics |
+1. **Start** backend (`:8000`) and frontend (`:3000`). Optionally run `seed.py` for dashboard filler, then `generate.py` for uploadable superbills.
 
-Actor identity travels as `X-Actor-Id`, `X-Actor-Name`, `X-Actor-Role` headers (set by the frontend sidebar switcher).
+2. **Upload** — open [`/upload`](http://localhost:3000/upload). Drop one or more superbill PDFs/PNGs. Single file redirects to [`/claims/{id}`](http://localhost:3000/claims); batch shows links to each new claim. Watch the **SSE live feed** and **pipeline diagram** as agents run.
+
+3. **Pipeline pause** — if intake, eligibility, scrub, submission, or reconciliation triggers review, SSE emits `paused` and status becomes `needs_review`. Open [`/review`](http://localhost:3000/review) to see the queue (sidebar badge).
+
+4. **Review Copilot** — on claim detail, ask *"Why is this in review?"* or *"What corrections are needed?"* Copilot answers from claim context only.
+
+5. **Approve or reject** — on [`/review`](http://localhost:3000/review) or claim detail:
+   - **Approve** (manager/supervisor, or biller within limits): pipeline resumes from extracted or scrubbed depending on reason; variance approval accepts payment and posts A/R.
+   - **Reject**: drafts appeal letter (status `appealed`) for high denial-risk holds.
+   - Try **Jordan Lee (biller)** from the sidebar on a high-dollar claim to see RBAC block (403).
+
+6. **Appeal & send** — on an appealed/denied claim detail, edit the appeal letter and click **Send Appeal** (`POST /claims/{id}/send-appeal`). Requires `ALERT_TO_EMAIL` and Resend config.
+
+7. **Dispute thread** — reply to the appeal email (inbound to Resend). With the webhook deployed (see Deployment Notes), the AI responds and asks about escalation. Reply **yes** to flag [`/disputes`](http://localhost:3000/disputes). Resolve from the disputes page.
+
+8. **Correct & resubmit** — on a denied claim, use **Correct Claim** panel: edit modifiers/ICD-10, provide reason, file frequency-7 replacement; new claim runs pipeline from coding.
+
+9. **Reconciliation & A/R** — after successful adjudication, reconciliation posts ERA; patient statement PDF and optional email generate when `patient_responsibility > 0`. View aging at [`/ar`](http://localhost:3000/ar).
+
+10. **Analytics & export** — [`/analytics`](http://localhost:3000/analytics) for operational KPIs; [`/claims`](http://localhost:3000/claims) to search/filter and **Export CSV**; [`/patients`](http://localhost:3000/patients) for enriched profiles linked from processed claims.
+
+## Deployment Notes
+
+**Dual-environment setup for disputes:**
+
+- Run the **main demo** locally: FastAPI on port 8000 + Next.js on port 3000, both pointing at the same Supabase project.
+- **Resend inbound webhooks** require a **public HTTPS URL**. Deploy a second FastAPI instance (commonly **Render** free tier) exposing only `POST /webhooks/resend-inbound` (or the full app). Configure Resend to POST inbound events to that URL.
+- Both environments share the **same Supabase project**. The webhook instance writes `dispute_thread` and `has_pending_dispute` to **Supabase Storage** (`claim-states/{id}.json`); the local backend merges those fields on `GET /claims/{id}` via `_apply_storage_dispute_fields`.
+- Free-tier Render services **cold-start** after idle periods; first webhook or health check may be slow.
+- CORS on the local API allows `http://localhost:3000` only.
+
+## Known Limitations
+
+- **Synthetic data only** — Faker-generated patients; demo NPI `1234567893`; no real PHI.
+- **Curated rule coverage** — NCCI pairs, MUE limits, LCD mappings, and fee schedules cover the demo CPT universe (~15 codes), not a commercial scrubber's full edit library.
+- **Single-org assumption** — one demo `orgs` row; no multi-tenant isolation beyond RLS placeholders.
+- **Demo RBAC** — header-based identity switcher, not SSO, JWT, or Postgres RLS tied to users.
+- **In-process fraud baselines** — cross-claim signals reset on backend restart; not warehouse-persisted.
+- **ClaimState primary persistence** — Supabase Storage, not the `claim_states` Postgres table (migration exists for future use).
+- **Mock payer only** — no live clearinghouse, EDI, or payer APIs.
+- **ML irreducible uncertainty** — training features exclude hidden payer state (auth on file, coverage termination); model AUC ~0.75+ on synthetic distribution, not production calibration.
+- **Dashboard business-impact math** on `/dashboard` uses a local 2.5 hr/claim estimate for one hero section; `/analytics` uses the backend's 12 min/claim definition.
 
 ## Compliance Note
 
-This is a prototype using **synthetic data only**. No real PHI was used at any stage. The architecture follows HIPAA-aware design principles (RLS, least-privilege, audit logging) but is not certified for production healthcare use without further compliance review.
+This project uses **synthetic data only**. No real protected health information (PHI) was collected, stored, or processed. The architecture includes HIPAA-aware design patterns (audit logging, least-privilege intent, RLS on migrated tables) as a prototype exercise, but ClaimPilot AI is **not certified** for production healthcare use and has not undergone formal compliance review.
 
 ## Author
 
-Anish Chitnis — Software Engineering Intern, Ampcus Inc., June 2026
+Anish Chitnis — Software Engineering Intern, Ampcus Inc.
