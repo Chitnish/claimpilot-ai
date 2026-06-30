@@ -140,13 +140,13 @@ export default function DisputesPage(): React.ReactElement {
           Appeals
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="font-display text-2xl font-bold tracking-tight text-white">
             Pending Disputes
           </h1>
           <Badge
             variant="outline"
             className={cn(
-              "border-amber-200 bg-amber-100 text-amber-800",
+              "border-amber-500/25 bg-amber-500/15 text-amber-300",
               items.length > 0 && "animate-status-pulse",
             )}
           >
@@ -222,16 +222,16 @@ export default function DisputesPage(): React.ReactElement {
                 <CardHeader className="pb-3 pt-5">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <CardTitle className="text-base text-slate-900">
+                      <CardTitle className="text-base text-white">
                         {item.patientName.trim() || "Unknown Patient"}
                       </CardTitle>
-                      <p className="mt-0.5 font-mono text-xs text-slate-500">
+                      <p className="mt-0.5 font-mono text-xs text-slate-400">
                         {truncateId(item.claimId, 8)}
                       </p>
                     </div>
                     <Badge
                       variant="outline"
-                      className="shrink-0 border-amber-200 bg-amber-100 text-amber-800"
+                      className="shrink-0 border-amber-500/25 bg-amber-500/15 text-amber-300"
                     >
                       <MessageSquareWarning className="mr-1 size-3" />
                       CARC {item.carcCode || "—"}
@@ -240,8 +240,8 @@ export default function DisputesPage(): React.ReactElement {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {previews.length > 0 && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-400">
                         <MessageSquare className="size-3.5" />
                         Recent thread
                       </p>
@@ -261,7 +261,7 @@ export default function DisputesPage(): React.ReactElement {
                                   "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ring-1",
                                   isAi
                                     ? "bg-gradient-to-br from-brand to-brand-dark text-white ring-white/30"
-                                    : "bg-white text-slate-500 ring-slate-200",
+                                    : "bg-white/[0.03] text-slate-400 ring-white/10",
                                 )}
                               >
                                 {isAi ? (
@@ -275,13 +275,13 @@ export default function DisputesPage(): React.ReactElement {
                                   "min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-sm",
                                   isAi
                                     ? "bg-brand/10 text-right"
-                                    : "bg-white ring-1 ring-slate-200",
+                                    : "bg-white/[0.03] ring-1 ring-white/10",
                                 )}
                               >
                                 <p
                                   className={cn(
                                     "text-[11px] font-semibold",
-                                    isAi ? "text-brand-dark" : "text-slate-600",
+                                    isAi ? "text-brand" : "text-slate-300",
                                   )}
                                 >
                                   {senderLabel(msg.sender)}
@@ -291,7 +291,7 @@ export default function DisputesPage(): React.ReactElement {
                                     </span>
                                   )}
                                 </p>
-                                <p className="line-clamp-1 text-slate-700">
+                                <p className="line-clamp-1 text-slate-200">
                                   {msg.messageText}
                                 </p>
                               </div>
@@ -305,7 +305,7 @@ export default function DisputesPage(): React.ReactElement {
                   <div onClick={(event) => event.stopPropagation()}>
                     <label
                       htmlFor={`dispute-note-${item.id}`}
-                      className="mb-1.5 block text-xs font-medium text-slate-600"
+                      className="mb-1.5 block text-xs font-medium text-slate-300"
                     >
                       Resolution note (optional)
                     </label>
@@ -353,7 +353,7 @@ export default function DisputesPage(): React.ReactElement {
       {toast && (
         <div
           role="status"
-          className="fixed bottom-6 right-6 z-50 max-w-sm rounded-lg border border-border bg-white px-4 py-3 text-sm shadow-card-hover"
+          className="fixed bottom-6 right-6 z-50 max-w-sm rounded-lg border border-white/10 bg-popover px-4 py-3 text-sm text-popover-foreground shadow-float"
         >
           {toast}
         </div>
